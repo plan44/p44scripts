@@ -1,0 +1,30 @@
+// Slow color change between hue=from and hue=to
+var from = 30 // orange
+var to = 140 // green
+var steps = 6 // number of steps
+var d = 5 // number of seconds per step - warning, do not set too short (>1 sec)
+// From here on the script should run endlessly in the background, but nevertheless
+// the scene call should be finished. Therefore the running color change
+// is moved to the background with `concurrent`.
+concurrent {
+  var hue = from
+  var step = (to-from)/steps
+  // Endless, until another scene is called
+  while(true) {
+    var i = 0
+    // Forward from->to
+    while (i<steps) {
+      output.channel('hue',from+i*step, d) // Set new hue value with fade time
+      output.applychannels() // Apply channels to hardware
+      delay(d) // Wait for fade time
+      i = i+1
+    }
+    // backwards to->from
+    while (i>0) {
+      output.channel('hue',from+i*step, d) // Set new hue value with crossfade time
+      output.applychannels() // Apply channels to hardware
+      delay(d) // Wait for fade time
+      i = i-1
+    }
+  }
+}

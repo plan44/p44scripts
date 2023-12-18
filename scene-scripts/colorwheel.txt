@@ -1,0 +1,21 @@
+// Slow color change through the whole hue color circle (0..360 degrees)
+var d = 10 // Number of seconds for a 15 degree step
+// Adjust current color value to an integer multiple of 15
+// (Not absolutely necessary, but recommended depending on the luminaire if the
+// pure red, green, blue color points should be achieved)
+output.channel('hue',round(output.channel('hue'),15));
+// From here on the script should run endlessly in the background, but nevertheless
+// the scene call should be completed. Therefore the running color change
+// is moved to the background with `concurrent`.
+concurrent {
+  // Endless until another scene is called
+  while(true) {
+    // increase hue (angle in color circle) by 15 degrees (goes back to 0 at 360)
+    // With fade time = d (see above)
+    output.dimchannel('hue',15, d)
+    // Apply channels to hardware
+    output.applychannels()
+    // Wait for fade time until the next 15 degree step is made
+    delay(d)
+  }
+}

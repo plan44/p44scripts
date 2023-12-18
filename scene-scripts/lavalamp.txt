@@ -1,0 +1,91 @@
+// remove all blobs
+view.clear()
+view.configure({
+  framing: 'repeatX|clipY',
+  //bgcolor: '#000016', // blue only
+  bgcolor: '#001608', // yellow orange
+  //rotation: 17 // to compensate for slanted torch windings
+})
+
+var area = ledchaincover()
+
+var sea = {
+  type: 'lightspot',
+  label: 'sea',
+  extent_x: 5,
+  extent_y: 5,
+  color: '#480',
+  bgcolor: '0000',
+  alpha:255,
+  z_order: 1000,
+  // finetuning
+  brightness_gradient: -1,
+  hue_gradient: 0.34,
+  saturation_gradient: 0,
+  brightness_mode: 'linear|oscillating|unlimited',
+  hue_mode: 'linear|oscillating|unlimited',
+  saturation_mode: 'linear|oscillating|unlimited',
+  radial: false,
+  orientation: 'up',
+}
+sea += area
+sea.dy = 5
+var s = makeview(sea)
+s.set('fullframe', true)
+view.addview(s)
+s.animator('rotation').repeat(-1,true).step(0.05,1).from(-15).runto(15,20)
+
+var blobcount = 0
+var currentblobs = 0
+
+while (true) {
+
+  var blob = {
+    type: 'lightspot',
+    extent_x: 5,
+    extent_y: 5,
+    color: hsv(random(15, 90, 1)), // yellow orange
+    //color: hsv(random(180,240,1)), // blue only
+    bgcolor: '0000',
+    alpha:200,
+    z_order: 900,
+    // finetuning
+    brightness_gradient: -1,
+    //hue_gradient: 0.34, // yellow orange
+    hue_gradient: 0, // blue only
+    saturation_gradient: 0,
+    brightness_mode: 'linear|oscillating|unlimited',
+    hue_mode: 'linear|oscillating|unlimited',
+    saturation_mode: 'linear|oscillating|unlimited',
+    radial: true,
+  }
+  blob += area
+  blobcount++
+  blob.label = format("blob_%d", blobcount)
+
+  var v = makeview(blob)
+  v.fullframe()
+  v.content_x = 5
+  v.content_y = 5
+  v.framing = "repeatX|clipY"
+
+  v.x = random(0, area.dx, 1)
+  //v.zoom_y = random(1,1.4)
+  view.addview(v)
+
+  concurrent passing v {
+    currentblobs++
+    threadvar a = v.animator('scroll_y').function('easeinout').from(10).runto(-area.dy+6,random(15,22))
+    await(a)
+    a = v.animator('scroll_y').function('easeinout').runto(10,random(18,30))
+    await(a)
+    v.remove()
+    currentblobs--
+    log('%s removed, now=%d',v.label, currentblobs)
+  }
+
+  delay(random(4,15))
+  while (currentblobs>=3) {
+    delay(20)
+  }
+}

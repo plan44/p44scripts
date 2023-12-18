@@ -1,0 +1,23 @@
+var updatedelay = 0 // Make the first light color adjustment immediately when the scene is called.
+// From here on the script should run endlessly in the background, but nevertheless
+// the scene call should be completed. Therefore the running adjustment
+// is moved to the background with `concurrent`.
+concurrent {
+  // Endless until another scene is called
+  while (true) {
+     // value of 0..1 for day run: 1: dusk or dawn, 0: middle of the day
+     var dayarc = abs(maprange(timeofday(), dawn(), dusk(), -1, 1))
+     // color temperature between 400 (at the beginning and end of the day) and 100 (middle of the day) mired
+     var mired = maprange(dayarc,1,0.5,400,100)
+     // Output to log for control (comment out if necessary)
+     log("dayarc = %f, mired = %d", dayarc, mired)
+     // Set color temperature channel to new value,
+     // (slow transition except first time)
+     output.channel('colortemp', mired, updatedelay)
+     // apply channels to hardware
+     output.applychannels()
+     // recalculate every 5 minutes from now on
+     updatedelay = 0:05
+     delay(updatedelay)
+  }
+}
