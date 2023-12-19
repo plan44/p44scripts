@@ -1,0 +1,8 @@
+{
+  'message':'init',
+  'inputs':[ {
+    'inputtype':0, 'usage':2, 'group':8, /* black: Joker */
+    'hardwarename': 'Internet-Test',
+    'updateinterval': 300, 'alivesigninterval': 900
+  }]
+}

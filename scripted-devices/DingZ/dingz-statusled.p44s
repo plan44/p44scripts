@@ -1,0 +1,39 @@
+// Configuration
+// - IP address of the dingz
+var ip='192.168.11.168'
+
+on (message()) as m {
+  if (m.message=='channel' && m.index==0) {
+    var ramp = 25 // dingz default = 25*10mS
+    if (isok(m.transition)) ramp = m.transition*100 // Sec -> 10mS
+    // Colour depending on output value: <50: red, >=50: green
+    var color
+    if (m.value>=50) {
+      color = '00FF00' // green
+    }
+    else {
+      color = 'FF0000' // red
+    }
+    // data object (list of url-encoded fields)
+    var data = {
+      "action":"on",
+      "mode":"rgb",
+    }
+    data.color = color
+    data.ramp = string(ramp)
+    // assemble request
+    var request = {
+      "method":"POST",
+      "formdata":true,
+    }
+    request.url = format("http://%s/api/v1/led/set", ip)
+    request.data = data
+    log("device: %s", request)
+    // send request
+    var ans = httprequest(request)
+    log("answer: %s", ans)
+  }
+}
+
+return true
+

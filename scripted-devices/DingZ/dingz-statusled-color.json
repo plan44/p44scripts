@@ -1,0 +1,6 @@
+{
+ 'message':'init',
+ 'name':'dingz LED color',
+ 'output':'colorlight',
+ 'group':8
+}

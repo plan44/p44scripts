@@ -1,0 +1,6 @@
+{
+ 'message':'init',
+ 'name':'dingz LED',
+ 'output':'basic',
+ 'group':8
+}

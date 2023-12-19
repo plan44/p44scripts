@@ -1,0 +1,62 @@
+function updateweather()
+{
+  try {
+    var t = geturl(baseurl,30)
+  }
+  catch {
+    return true
+  }
+
+  log (7, "OpenWeatherMap reply = %s", t)
+  var weather = json(t);
+  log (6, "OpenWeatherMap weather = %s", weather)
+
+  if (isvalid(weather.main.temp)) {
+    message(format("S0=%.1f",weather.main.temp))
+  }
+  if (isvalid(weather.main.pressure)) {
+    message(format("S1=%.1f",weather.main.pressure))
+  }
+  if (isvalid(weather.main.humidity)) {
+    message(format("S2=%.1f",weather.main.humidity))
+  }
+  if (isvalid(weather.visibility)) {
+    message(format("S3=%.1f",weather.visibility))
+  }
+  if (isvalid(weather.wind.speed)) {
+    message(format("S4=%.1f",weather.wind.speed))
+  }
+  if (isvalid(weather.wind.deg)) {
+    message(format("S5=%.1f",weather.wind.deg))
+  }
+  /* without gust info -> zero gust */
+  message(format("S6=%.1f", ifvalid(weather.wind.gust,0)))
+  /* Precipitation */
+  var precipitation = ifvalid(
+    weather.snow['1h'], // Snow..
+    ifvalid(
+      weather.rain['1h'], // if no snow: rain
+      0 // neither snow nor rain
+    )
+  )
+  message(format("S7=%.1f",precipitation))
+  /* Irradiation */
+  if (isvalid(weather.clouds.all)) {
+    message(format("S8=%.1f",weather.clouds.all))
+  }
+}
+
+// the OpenWeatherMap API key, city and country must be entered here
+var openweathertoken = 'API_key'; // API key
+var openweathercity = 'Zug'; // Location (name of town)
+var openweathercountry = 'CH'; // Location (country)
+var baseurl = string('https://api.openweathermap.org/data/2.5/weather?q=' + openweathercity + '%2C' + openweathercountry +  '&units=metric&appid=' + openweathertoken)
+
+
+// Every 120 Seconds
+on (every(120)) {
+  // update weather
+  updateweather()
+}
+
+return true // it's ok that the script ends here

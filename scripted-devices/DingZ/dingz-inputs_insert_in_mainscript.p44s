@@ -1,0 +1,21 @@
+// http requests from devices (improved version 2023-01-18)
+on(webrequest()) as request
+{
+  log(6, "webrequest = %s", request)
+  try {
+    // Process request
+    if (isok(request.dingz)) {
+      // this is a request from a dingz
+      // - forward via dignz_signal_192_168_ip_ip
+      var s = ifok(globalvars()['dingz_signal_'+replace(request.peer,'.','_')], false)
+      if (isok(s)) s.send(request)
+    }
+    // always answer
+    request.answer({ "status":"ok" })
+  }
+  catch as e {
+    log(4, "Error during request processing: %s", e)
+    // even in case of error: answer to avoid client hanging until timeout
+    request.answer({ "status":"error" })
+  }
+}

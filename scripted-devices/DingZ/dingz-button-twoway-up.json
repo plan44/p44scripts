@@ -1,0 +1,9 @@
+{
+  "message": "init",
+  "uniqueid": "dingz_twoway_1234", /* same for both parts, but different for each pair! */
+  "subdeviceindex": 0, /* first part of two-way pushbutton */
+  "group":8, /* joker */
+  "buttons": [{
+    "buttontype": 0, "group":1, "combinables": 2, "hardwarename": "up"
+  }]
+}

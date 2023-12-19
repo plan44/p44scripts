@@ -1,0 +1,52 @@
+function updatestate()
+{
+  try {
+    var t = geturl(baseurl + '/report');
+    log (7, "myStrom reply = %s", t)
+    var state = json(t);
+    log (6, "myStrom state = %s", state)
+    if (isvalid(state.relay)) {
+      var msg = { "message":"channel","index":0 }
+      msg.value = if(state.relay, 100, 0);
+      message(msg)
+    }
+    if (isvalid(state.power)) {
+      var msg = { "message":"sensor", "index":0 }
+      msg.value = state.power;
+      message(msg)
+    }
+    message({ "message":"active","value":true }) // device responds: set active
+  }
+  catch as err {
+    log(6,"mystrom at url %s does not answer correctly: %s", baseurl, err)
+    message({ "message":"active","value":false }) // device does not respond: set inactive
+  }
+}
+
+// the correct IP address of the socket must be entered here
+var baseurl = "http://192.168.1.42"
+
+on (message()) as m {
+  if (m.message=="channel" && m.index==0) {
+    try {
+      // access mySTROM API and switch on if brightness > 50%, otherwise switch off
+      geturl(baseurl + format('/relay?state=%d', if(m.value>50, 1, 0)), 5)
+      message({ "message":"active","value":true }) // device responds: set active
+    }
+    catch as err {
+      log(6,"mystrom at url %s does not answer correctly: %s", baseurl, err)
+      message({ "message":"active","value":false }) // device does not respond: set inactive
+    }
+  }
+}
+
+// every 30 seconds
+on (every(30)) {
+  // Read status
+  updatestate()
+}
+
+// read current state immediately on device startup
+updatestate()
+
+return true // it's ok that the script ends here

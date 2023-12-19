@@ -1,0 +1,13 @@
+{
+  "message":"init",
+  "modelname":"DingZ_Motion",
+  "colorclass":6,
+  "inputs": [
+    {
+      "inputtype":5,
+      "usage":1,
+      "group":6,
+      "hardwarename":"motion"
+    }
+  ]
+}

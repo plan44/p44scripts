@@ -1,0 +1,13 @@
+// Every minute:
+on(every(0:01)) {
+  // read the value from the file, treat it as a number and scale it (file returns 1/1000 degrees)
+  var t = number(readfile('/sys/class/thermal/thermal_zone0/temp'))/1000;
+  // report as sensor value
+  message(format("S0=%.1f",t))
+}
+
+// important: signals that it's ok that the script ends here
+// Only the handler is running in the background.
+// If this "return true" is missing, the implementation will be restarted 20 seconds after
+// exit (assuming that an error has occurred)
+return true

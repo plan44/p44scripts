@@ -1,0 +1,18 @@
+{
+  'message': 'init',
+  'protocol': 'simple',
+  'group': 8, /* Joker */
+  'name': 'OpenWeatherMap.org', /* initialer Name */
+  /* Definition der Wetter-Sensoren */
+  'sensors': [
+    /* S0 */ { 'sensortype': 1,  'usage': 2, 'group': 0, 'hardwarename': 'temperature',   'min': 0, 'max': 100,   'resolution': 0.1, 'updateinterval': 120 },
+    /* S1 */ { 'sensortype': 18, 'usage': 2, 'group': 0, 'hardwarename': 'pressure',      'min': 0, 'max': 1200,  'resolution': 1,   'updateinterval': 120 },
+    /* S2 */ { 'sensortype': 2,  'usage': 2, 'group': 0, 'hardwarename': 'humidity',      'min': 0, 'max': 100,   'resolution': 1,   'updateinterval': 120 },
+    /* S3 */ { 'sensortype': 29, 'usage': 2, 'group': 0, 'hardwarename': 'visibility',    'min': 0, 'max': 10000, 'resolution': 1,   'updateinterval': 120 },
+    /* S4 */ { 'sensortype': 13, 'usage': 2, 'group': 0, 'hardwarename': 'wind speed',    'min': 0, 'max': 300,   'resolution': 0.1, 'updateinterval': 120 },
+    /* S5 */ { 'sensortype': 19, 'usage': 2, 'group': 0, 'hardwarename': 'wind deg',      'min': 0, 'max': 360,   'resolution': 1,   'updateinterval': 120 },
+    /* S6 */ { 'sensortype': 23, 'usage': 2, 'group': 0, 'hardwarename': 'wind gust',     'min': 0, 'max': 300,   'resolution': 0.1, 'updateinterval': 120 },
+    /* S7 */ { 'sensortype': 21, 'usage': 2, 'group': 0, 'hardwarename': 'precipitation', 'min': 0, 'max': 1000,  'resolution': 0.1, 'updateinterval': 120 },
+    /* S8 */ { 'sensortype': 0,  'usage': 2, 'group': 0, 'hardwarename': 'clouds %',      'min': 0, 'max': 100,   'resolution': 1,   'updateinterval': 120 }
+  ]
+}

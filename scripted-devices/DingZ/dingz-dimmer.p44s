@@ -1,0 +1,21 @@
+// Configuration
+// - IP address of the dingz
+var ip='192.168.1.123'
+// - which dimmer?
+var dimmerindex=0
+
+// implementation
+on (message()) as m {
+  if (m.message=='channel' && m.index==0) {
+    var ramp = 25 // dingz default = 25*10mS
+    if (isok(m.transition)) ramp = m.transition*100 // sec -> 10mS
+    var post = format(
+      'http://%s/api/v1/dimmer/%d/on?value=%d&ramp=%d',
+      ip, dimmerindex, m.value, ramp
+    )
+    log(6, "posting: %s", post)
+    posturl(post, 5)
+  }
+}
+
+return true

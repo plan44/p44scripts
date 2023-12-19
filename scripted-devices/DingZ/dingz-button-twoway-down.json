@@ -1,0 +1,9 @@
+{
+  "message": "init",
+  "uniqueid": "dingz_twoway_1234", /* same as first part */
+  "subdeviceindex": 1, /* other part of the two-way switch */
+  "group":8, /* joker */
+  "buttons": [{
+    "buttontype": 0, "group":1, "combinables": 2, "hardwarename": "down"
+  }]
+}

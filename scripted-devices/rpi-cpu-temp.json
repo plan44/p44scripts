@@ -1,0 +1,10 @@
+{
+  'message':'init',
+  'protocol':'simple',
+  'group':3, /* blue/climate */
+  'name':'RPi CPU temp.', /* initial name */
+  'sensors':[
+    /* sensortype1 = temperature, updateinterval = 60 = read once per minute */
+    {'sensortype':1,'usage':1,'hardwarename':'RPiCPU','min':0,'max':100,'resolution':0.1,'updateinterval':60}
+  ]
+}

@@ -1,0 +1,27 @@
+// This URL must be reachable on the Internet. The Apple example works as-is,
+// but you can take any other URL that is reliably reachable and returns a small
+// response (for efficiency reasons)
+var testurl = "http://www.apple.com/library/test/success.html"
+
+// every 5 minutes:
+on (every(0:05)) {
+  var msg = {'message':'input', 'index':0 }
+  try {
+    // If "testurl" returns an error free answer within 10 sec, the internet connection is working
+    var ans = geturl(testurl, 10)
+    log(6, "Internet is ok")
+    msg.value = 1
+  }
+  catch as e {
+    // Error or timeout accessing the "testurl".
+    log(4, "No internet access")
+    msg.value = 0
+  }
+  message(msg)
+}
+
+// Important: signals that it's ok that the script exits here
+// Only the handler runs in the background.
+// If this "return true" is missing, the implementation will be restarted 20 seconds after
+// exit (assuming that an error has occurred)
+return true

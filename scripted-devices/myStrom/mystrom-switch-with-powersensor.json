@@ -1,0 +1,8 @@
+{
+  'message':'init',
+  'output':'light', /* with output of type "light"... */
+  'dimmable':false, /* ...but not dimmable */
+  'colorclass':8, /* universally usable, in Digital Strom: black joker terminal */
+  /* definition of a power sensor */
+  'sensors':[{"sensortype":14, "usage":0, "hardwarename": "power", "min":0, "max":2300, "resolution":1, "updateinterval":30, "alivesigninterval":300}]
+}

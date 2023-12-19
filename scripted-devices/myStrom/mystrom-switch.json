@@ -1,0 +1,6 @@
+{
+  'message':'init',
+  'output':'light', /* with output of type "light"... */
+  'dimmable':false, /* ...but not dimmable */
+  'colorclass':8, /* universally usable, in Digital Strom: black joker terminal */
+}

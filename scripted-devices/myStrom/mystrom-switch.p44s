@@ -1,0 +1,20 @@
+// the correct IP address of the socket must be entered here
+var baseurl = "http://192.168.1.42"
+
+// handle messages from the system (here: change of output value)
+on (message()) as m {
+  // if the message concerns the channel with index 0 (=brightness)...
+  if (m.message=="channel" && m.index==0) {
+    try {
+      // access mySTROM API and switch on if brightness > 50%, otherwise switch off
+      geturl(baseurl + format('/relay?state=%d', if(m.value>50, 1, 0)), 5)
+      message({ "message":"active","value":true }) // device responds: set active
+    }
+    catch as err {
+      log(6,"mystrom at url %s does not answer correctly: %s", baseurl, err)
+      message({ "message":"active","value":false }) // device does not respond: set inactive
+    }
+  }
+}
+
+return true // it's ok that the script ends here

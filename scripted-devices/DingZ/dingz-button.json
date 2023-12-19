@@ -1,0 +1,8 @@
+{
+  'message':'init',
+  'group':1, /* yellow/light */
+  'name':'dingz button 1', /* initial name */
+  'buttons':[
+    { 'buttontype':1, 'group':1 }
+  ]
+}

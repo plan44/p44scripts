@@ -1,0 +1,38 @@
+// configuration
+// - IP address of the dingz
+var ip='192.168.1.123'
+// - which button?
+var button="button1"
+
+// implementation (improved 2022-10-18)
+var signame = 'dingz_signal_'+replace(ip,'.','_')
+var sig
+if (!isok(globalvars()[signame])) {
+  // signal for this IP does not yet exist: create new one
+  globalvars()[signame] = signal()
+}
+// using existing or newly created signal
+sig = globalvars()[signame]
+
+on (sig) as s {
+  log(6, "s = %s", s)
+  if (s.dingz==button) {
+    // this is the right button
+    var msg = {'message':'button', 'index':0 }
+    if (s.click==0) {
+      // button released
+      msg.value = -10
+    }
+    else if (s.click==5) {
+      // button held longer
+      msg.value = -11
+    }
+    else {
+      // 1..4-fold click, feed directly (negative value)
+      msg.value = -s.click
+    }
+    message(msg)
+  }
+}
+
+return true;

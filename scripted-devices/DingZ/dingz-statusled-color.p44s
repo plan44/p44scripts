@@ -1,0 +1,68 @@
+// Configuration
+// - IP address of the dingz
+var ip='192.168.59.128'
+
+
+var hue = 0
+var saturation = 100
+var brightness = 0
+
+
+// Note: this function is only needed in firmware before 2.7.0.35/2.7.0
+//   which are not enabled for SmartLEDs. In later firmware, hsv() is
+//   a built-in function available also when SmartLEDs are not enabled.
+function hsv(h,s,v)
+{
+  var h = cyclic(h, 0, 360)
+  var hi = int(hue / 60) % 6
+  var f = frac(hue / 60)
+  var p = v * (1 - s)
+  var q = v * (1 - s*f)
+  var t = v * (1 - s*(1-f))
+  var r = 0
+  var g = 0
+  var b = 0
+  if (hi==0) { r = v; g = t; b = p; }
+  else if (hi==1) { r = q; g = v; b = p; }
+  else if (hi==2) { r = p; g = v; b = t; }
+  else if (hi==3) { r = p; g = q; b = v; }
+  else if (hi==4) { r = t; g = p; b = v; }
+  else if (hi==5) { r = v; g = p; b = q; }
+  return format("#%02X%02X%02X", r*255, g*255, b*255)
+}
+
+
+on (message()) as m {
+  if (m.message=='channel') {
+    // update the channel
+    if (m.id=='hue') hue = m.value;
+    else if (m.id=='saturation') saturation = m.value;
+    else if (m.id=='brightness') brightness = m.value;
+    // re-send color for every channel change
+    var ramp = 25 // dingz default = 25*10mS
+    if (isok(m.transition)) ramp = m.transition*100 // Sec -> 10mS
+    // calculate color
+    var color = hsv(hue, saturation/100, brightness/100) // 0..100% -> 0..1
+    // data object (list of url-encoded fields)
+    var data = {
+      "action":"on",
+      "mode":"rgb",
+    }
+    data.color = substr(color,1)
+    data.ramp = string(ramp)
+    // assemble request
+    var request = {
+      "method":"POST",
+      "formdata":true,
+    }
+    request.url = format("http://%s/api/v1/led/set", ip)
+    request.data = data
+    log("device: %s", request)
+    // send request
+    var ans = httprequest(request)
+    log("answer: %s", ans)
+  }
+}
+
+return true
+

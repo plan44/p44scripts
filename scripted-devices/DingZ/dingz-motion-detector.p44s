@@ -1,0 +1,34 @@
+// configuration
+// - IP address of the dingz
+var ip='192.168.x.x'
+// - which input
+var input="motion_internal"
+
+// implementation (improved 2022-10-18)
+var signame = 'dingz_signal_'+replace(ip,'.','_')
+var sig
+if (!isok(globalvars()[signame])) {
+  // signal for this IP does not yet exist: create new one
+  globalvars()[signame] = signal()
+}
+// using existing or newly created signal
+sig = globalvars()[signame]
+
+on (sig) as s {
+  log(6, "s = %s", s)
+  if (s.dingz==input) {
+    // this is the right input
+    var msg = {'message':'input', 'index':0 }
+    if (s.state>0) {
+      // motion detected
+      msg.value = 1
+    }
+    else {
+      // no motion detected
+      msg.value = 0
+    }
+    message(msg)
+  }
+}
+
+return true;
