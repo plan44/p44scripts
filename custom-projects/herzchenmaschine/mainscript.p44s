@@ -1,0 +1,379 @@
+// setup LED layout
+function setupLEDs()
+{
+  // config LED chains
+  removeledchains()
+  addledchain("WS2813.GRB:/dev/ledchain0:145:0:9:0:9:11:1:SAY") // matrix 9x9 at 0,0
+  addledchain("WS2813.GRB:/dev/ledchain0:145:0:24:20:1:121:SA") // linear top light 1x24 at 0,20
+  addledchain("WS2813.GRB:/dev/ledchain0:145:0:1:9:7:100:S") // extension of 9x9 at left edge from 8,10..8,16
+  lrg.configure(ledchaincover()).set("fullframe",true)
+}
+
+
+
+// movement primitives
+
+function rotate(dir)
+{
+  log(format("rotate %d", dir))
+  abort(m3timer)
+  if (dir==0) {
+    motor3.stop()
+    abort(outmovetimer)
+  }
+  else {
+    // grab fail detector
+    if (grabbed && !outmove && dir>0) {
+      concurrent as outmovetimer {
+        delay(0.5)
+        outmove = true
+      }
+    }
+    motor3.power(57, if(dir<0, -1, 1), 0);
+    concurrent as m3timer {
+      delay(5)
+      motor3.stop()
+    }
+  }
+}
+
+
+function lift(dir)
+{
+  log(format("lift %d", dir))
+  abort(m2timer)
+  if (dir==0) {
+    motor2.stop();
+  }
+  else {
+    if (dir>0) {
+      motor2.currentlimit(444,0.5,1000)
+      motor2.power(75, 1, 0);
+    }
+    else {
+      if (grabbed) {
+        grab(0)
+      }
+      else {
+        motor2.currentlimit(160,0.5,700)
+        motor2.power(25, -1, 0);
+      }
+    }
+    concurrent as m2timer {
+      delay(2)
+      motor2.stop()
+    }
+  }
+}
+
+
+function pump(dir)
+{
+  log(format("pump %d", dir))
+  if (dir==0) {
+    motor1.power(0,0.5)
+  }
+  else {
+    motor1.power(80,dir,0.5)
+  }
+}
+
+
+
+function grab(dir)
+{
+  log(format("grab %d", dir))
+  if (dir>0) {
+    // grab detected
+    grabbed = true
+    abort(outmovetimer)
+    outmove = false
+    scene('Herz')
+    timerbar.set('alpha', 0) // hide
+    motor1.stop() // safety only
+  }
+  else {
+    if (grabbed) {
+      log("release now")
+      // release sticker
+      if (outmove) {
+        // block game, make http response return "done"
+        gameover = true
+        concurrent {
+          pump(-1)
+          delay(1)
+          pump(0)
+          scene('Gewinn',0)
+          heart.set('alpha',255)
+          var a = heart.animator('content_y').from(9).repeat(5).runto(-9,0.9)
+          await(a)
+          heart.set('alpha',0)
+          endgame()
+        }
+      }
+      else {
+        // miss, allow retry
+        log("released but likely no sticker ejected, restarting")
+        grabbed = false
+        outmove = false
+        scene('Spiel')
+        timerbar.set('alpha', 255) // show again
+        concurrent {
+          pump(-1)
+          delay(1)
+          pump(1)
+        }
+      }
+    }
+  }
+}
+
+
+function peerInfo(peer)
+{
+  var leases = json(system("ubus call dhcp ipv4leases")).device.wlan0.leases
+  var i = 0
+  while (i<elements(leases)) {
+    var l = leases[i]
+    if (peer==l.address) {
+      var info = {}
+      info.peer = peer
+      info.mac = l.mac
+      info.name = l.hostname
+      return info
+    }
+    i = i +1
+  }
+  return null
+}
+
+
+function recentplayer(p)
+{
+  var sp = ifvalid(players[p.mac],null)
+  if (sp) {
+    // known
+    if (sp.started+playinterval>epochtime()) {
+      // too soon
+      return true
+    }
+  }
+  // add/update info
+  players[p.mac] = p
+  return false
+}
+
+
+function disconnectplayer(p)
+{
+  if (p.name=="MBP13-2020") return; // do not disconnect the developer ;-)
+  var m = p.mac
+  var mac = substr(m,0,2)+':'+substr(m,2,2)+':'+substr(m,4,2)+':'+substr(m,6,2)+':'+substr(m,8,2)+':'+substr(m,10,2)
+  var deauth = format("ubus call hostapd.wlan0 del_client '{ \"addr\":\"%s\", \"reason\":4, \"deauth\":true, \"ban_time\":%d }'", mac, reconnectinterval*1000)
+  system(deauth)
+  log("kicked %s (%s) from WiFi", p.peer, mac)
+}
+
+
+
+function stopmachine()
+{
+  log("stopping machine")
+  abort(playtimer)
+  pump(0)
+  lift(0)
+  rotate(0)
+  timerbar.stopanimations()
+  timerbar.set('y',-16)
+  scene('Aus',5)
+}
+
+
+function endgame()
+{
+  gameover = true
+  log("ending game")
+  stopmachine()
+  concurrent {
+    delay(3)
+    disconnectplayer(player)
+    player = null
+  }
+}
+
+
+function startgame()
+{
+  log("starting game")
+  abort(playtimer)
+  grabbed = false
+  outmove = false
+  gameover = false
+  scene('Spiel')
+  pump(1)
+  // install overall game timeout
+  concurrent as playtimer {
+    delay(playtime)
+    log("timeout, ending game")
+    endgame()
+  }
+  // animate timer timer bar
+  timerbar.set('alpha', 255) // show
+  timerbar.animator('y').from(-16).runto(0,0.7) // quickly animate up
+  timerbar.animator('y').delay(2).from(0).runto(-16,playtime) // slowly down
+}
+
+
+
+// rotate
+var m3timer
+var motor3
+// lift
+var m2timer
+var motor2
+// pump
+var motor1
+var grabbed = false
+var outmove = false
+var outmovetimer
+// Indicators
+var timerbar
+// Game control
+var player = null
+var players = {}
+var playinterval = 0:03
+var reconnectinterval = 0:02
+var playtime = 0:01
+var playtimer
+var idletime = 30
+var idletimer
+var gameover = true
+
+
+// overall LED chain layout
+setupLEDs()
+
+// heart
+var heart = makeview({"type":"image","x":0,"y":0,"dx":9,"dy":9, "file":"/flash/apprsrc/heart.png", "sizetocontent":false, "alpha":0 })
+lrg.addview(heart)
+
+// Indicator
+timerbar = makeview({ "type":"plain", "x":0, "y":-16, "dx":1, "dy":16, "fullframe":true, "color":"#002AFF" })
+lrg.addview(timerbar);
+
+// PWM enable
+var pwmen02 = digitalio("i2c0.MCP23017@24.6", true, true);
+var pwmen1 = digitalio("i2c0.MCP23017@24.7", true, true);
+
+// pump
+motor1 = dcmotor("pwmchip0.3.50000","i2c0.MCP23017@24.0","i2c0.MCP23017@24.1")
+var sens1 = analogio("i2c0.MAX1161x@33.0", false, 0)
+
+sens1.filter("abs-average",2)
+motor1.currentsensor(sens1,0.5)
+motor1.currentlimit(2000,2,3200)
+
+on (motor1.status()) evaluating as s {
+  log(format("Motor1 status = %s",s))
+  if (isvalid(s.stoppedby)) {
+    // autostopped
+    if (s.stoppedby=="overcurrent") {
+      grab(1)
+    }
+  }
+}
+
+// Crane lift
+motor2 = dcmotor("pwmchip0.1.50000","i2c0.MCP23017@24.2","i2c0.MCP23017@24.3")
+var sens2 = analogio("i2c0.MAX1161x@33.1", false, 0)
+
+//sens2.filter("abs-average",2)
+motor2.currentsensor(sens2,0.2)
+motor2.currentlimit(400)
+
+on (motor2.status()) evaluating as s {
+  log(format("Motor2 status = %s",s))
+  if (isvalid(s.stoppedby)) {
+    log("lift autostopped")
+  }
+}
+
+
+// Crane rotation
+motor3 = dcmotor("pwmchip0.2.50000","i2c0.MCP23017@24.4","i2c0.MCP23017@24.5")
+var sens3 = analogio("i2c0.MAX1161x@33.2", false, 0)
+
+//sens3.filter("abs-average",2)
+motor3.currentsensor(sens3,0.2)
+motor3.currentlimit(600, 0.5, 900)
+
+on (motor3.status()) evaluating as s {
+  log(format("Motor3 status = %s",s))
+  if (isvalid(s.stoppedby)) {
+    log("rotation autostopped")
+  }
+}
+
+// signal machine ready
+scene('Powerup',0);
+delay(0.5);
+scene('Aus',2);
+
+// Game UI request handler
+on (webrequest()) as request {
+  log(format('Webrequest: %s', request))
+  if (player!=null && player.peer!=request.peer) {
+    // wrong player
+    log("wrong player=%s, current=%s", request.peer, player.peer)
+    request.answer({ "result":"Busy" });
+    return
+  }
+  // no or current player
+  if (player==null && request.cmd=='start') {
+    // no player yet, requests new game
+    player = peerInfo(request.peer)
+    player.started = epochtime();
+    // check for having played too recently
+    if (recentplayer(player)) {
+      log("played too recently: %s", request.peer)
+      player = null
+      request.answer({ "result":"Played" })
+      return
+    }
+    log ("starting with new player: %s", player)
+    startgame()
+  }
+  else if (request.cmd=='stop') {
+    stopmachine()
+    player = null
+  }
+  else if (request.cmd=='endgame') {
+    endgame()
+  }
+  else if (player==null) {
+    request.answer({ "result":"Done" })
+    return;
+  }
+  else if (!gameover) {
+    // game in progress
+    // - inactivity timeout
+    abort(idletimer)
+    concurrent as idletimer {
+      delay(idletime)
+      log("inactivity timeout, ending game")
+      endgame()
+    }
+    if (request.cmd=='lift') {
+      lift(number(request.dir))
+    }
+    else if (request.cmd=='rotate') {
+      rotate(number(request.dir))
+    }
+  }
+  if (gameover) {
+    request.answer({ "result":"Done" })
+  }
+  else {
+    request.answer({ "result":"OK" })
+  }
+}
