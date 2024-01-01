@@ -1,0 +1,4 @@
+// this can be put into the mainscript to have the P44-LC
+// automatically call a scene at startup
+
+scene("Fackel")
