@@ -1,0 +1,58 @@
+// "Rectangles"
+
+// How to use:
+// - create a LED light of type "stack" (set "Feature Config" to "stack")
+//   for this effect to appear
+// - put this script into a scene of your choice
+// - make sure the light has a non-zero brightness in this scene
+// - call the scene, the scene script will execute and generate the effect
+
+// remove all rectangles
+view.clear()
+view.configure({
+  framing: 'repeatX|repeatY',
+})
+
+var area = ledchaincover()
+
+var rectcount = 0
+var currentrects = 0
+
+while (true) {
+
+  var rect = {
+    type: 'plain',
+    dx: random(4,area.dx,1),
+    dy: random(4,area.dy-5,1),
+    x: random(0,area.dx-4,1),
+    y: random(0,area.dy-4,1),
+    color: hsv(random(0,359,1),random(0.7,1),1),
+    alpha: 0, // random(128,255,0),
+    z_order: random(500,599,1),
+  }
+  rectcount++
+  rect.label = format("rect_%d", blobcount)
+
+  var r = makeview(rect)
+  r.fullframe()
+  r.framing = "clipXY"
+
+  view.bgcolor='#000'
+  view.addview(r)
+
+  concurrent passing r {
+    currentrects++
+    threadvar a = r.animator('alpha').runto(255,1)
+    await(a)
+    threadvar a = r.animator('alpha').runto(0,1)
+    await(a)
+    r.remove()
+    currentrects--
+    log(6, '%s removed, now=%d',r.label, currentrects)
+  }
+
+  delay(0.2)
+  while (currentrects>=20) {
+    delay(random(0.7,2))
+  }
+}

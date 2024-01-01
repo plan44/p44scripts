@@ -1,0 +1,68 @@
+// "Metropolis"
+
+// How to use:
+// - create a LED light of type "stack" (set "Feature Config" to "stack")
+//   for this effect to appear
+// - put this script into a scene of your choice
+// - make sure the light has a non-zero brightness in this scene
+// - call the scene, the scene script will execute and generate the effect
+
+// remove all rings
+view.clear()
+view.configure({
+  framing: 'repeatX|clipY',
+  bgcolor: '#333',
+  //rotation: 17 // to compensate for slanted torch windings
+})
+
+var area = ledchaincover()
+
+var ringcount = 0
+var currentrings = 0
+
+while (true) {
+
+  var ring = {
+    type: 'lightspot',
+    extent_x: 5,
+    extent_y: 5,
+    //color: hsv(random(5, 42, 1)),
+    color: hsv(random(140,190,1)),
+    bgcolor: '0000',
+    alpha:200,
+    z_order: random(500,599,1),
+    // finetuning
+    orientation:'up',
+    brightness_gradient: -1,
+    hue_gradient: 0,
+    saturation_gradient: 0,
+    brightness_mode: 'log|oscillating|unlimited',
+    hue_mode: 'linear|oscillating|unlimited',
+    saturation_mode: 'linear|oscillating|unlimited',
+    radial: false,
+  }
+  ring += area
+  ringcount++
+  ring.label = format("ring_%d", ringcount)
+
+  var v = makeview(ring)
+  v.fullframe()
+  v.content_x = 2
+  v.content_y = 0
+  v.framing = "repeatX|clipY"
+
+  view.addview(v)
+
+  concurrent passing v {
+    currentrings++
+    threadvar a = v.animator('scroll_x').from(5).repeat(2,true).runto(-area.dy+2,random(2.2,8.2))
+    await(a)
+    v.remove()
+    currentrings--
+    log(6, '%s removed, now=%d',v.label, currentrings)
+  }
+
+  while (currentrings>=4) {
+    delay(random(0.7,7.1))
+  }
+}

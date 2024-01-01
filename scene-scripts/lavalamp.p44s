@@ -1,5 +1,12 @@
 // "Lava-Lamp"
 
+// How to use:
+// - create a LED light of type "stack" (set "Feature Config" to "stack")
+//   for this effect to appear
+// - put this script into a scene of your choice
+// - make sure the light has a non-zero brightness in this scene
+// - call the scene, the scene script will execute and generate the effect
+
 // remove all existing subviews (blobs from previous runs)
 view.clear()
 view.configure({
@@ -85,7 +92,7 @@ while (true) {
     // that's it for this blob, remove it
     v.remove()
     currentblobs--
-    log('%s removed, now=%d',v.label, currentblobs)
+    log(6, '%s removed, now=%d',v.label, currentblobs)
   }
 
   // wait a bit before creating another blob
