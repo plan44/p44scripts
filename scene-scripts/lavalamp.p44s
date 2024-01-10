@@ -1,5 +1,7 @@
 // "Lava-Lamp"
 
+// Note: this version of the Lava-Lamp script needs FW x.7.0.36 or later
+
 // How to use:
 // - create a LED light of type "stack" (set "Feature Config" to "stack")
 //   for this effect to appear
@@ -21,8 +23,8 @@ var area = ledchaincover()
 var sea = {
   type: 'lightspot',
   label: 'sea',
-  extent_x: 5,
-  extent_y: 5,
+  orientation: 'up',
+  content_dx: 5,
   color: '#480',
   bgcolor: '0000',
   alpha:255,
@@ -35,12 +37,11 @@ var sea = {
   hue_mode: 'linear|oscillating|unlimited',
   saturation_mode: 'linear|oscillating|unlimited',
   radial: false,
-  orientation: 'up',
 }
 sea += area
+sea.content_dy = sea.dx
 sea.dy = 5
 var s = makeview(sea)
-s.set('fullframe', true)
 view.addview(s)
 // make it "rocking" a bit with a continuously running back-and-forth animation of the rotation parameter
 s.animator('rotation').repeat(-1,true).step(0.05,1).from(-15).runto(15,20)
@@ -52,8 +53,8 @@ while (true) {
 
   var blob = {
     type: 'lightspot',
-    extent_x: 5,
-    extent_y: 5,
+    content_dx: 5,
+    content_dy: 5,
     color: hsv(random(15, 90, 1)), // orange to yellow
     bgcolor: '0000', // transparent background (important)
     alpha:200,
@@ -72,7 +73,6 @@ while (true) {
   blob.label = format("blob_%d", blobcount)
 
   var v = makeview(blob)
-  v.fullframe()
   v.content_x = 5
   v.content_y = 5
   v.framing = 'repeatX|clipY' // wrap around tube in X-direection
