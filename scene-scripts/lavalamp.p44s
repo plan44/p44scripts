@@ -84,10 +84,10 @@ while (true) {
   concurrent passing v {
     currentblobs++
     // move up
-    threadvar a = v.animator('scroll_y').function('easeinout').from(10).runto(-area.dy+6,random(15,22))
+    threadvar a = v.animator('scroll_y').function('easeout').from(10).runto(-area.dy+6,random(15,22))
     await(a)
     // sink down again
-    a = v.animator('scroll_y').function('easeinout').runto(10,random(18,30))
+    a = v.animator('scroll_y').function('easein').runto(10,random(18,30))
     await(a)
     // that's it for this blob, remove it
     v.remove()
