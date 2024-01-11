@@ -1,5 +1,7 @@
 // "Metropolis"
 
+// Note: this version of the Lava-Lamp script needs FW x.7.0.36 or later
+
 // How to use:
 // - create a LED light of type "stack" (set "Feature Config" to "stack")
 //   for this effect to appear
@@ -24,29 +26,27 @@ while (true) {
 
   var ring = {
     type: 'lightspot',
-    extent_x: 5,
-    extent_y: 5,
-    //color: hsv(random(5, 42, 1)),
+    orientation:'up',
+    content_dx: 3,
     color: hsv(random(140,190,1)),
     bgcolor: '0000',
-    alpha:200,
+    alpha:100,
     z_order: random(500,599,1),
     // finetuning
-    orientation:'up',
-    brightness_gradient: -1,
+    brightness_gradient: -2.7,
     hue_gradient: 0,
     saturation_gradient: 0,
-    brightness_mode: 'log|oscillating|unlimited',
-    hue_mode: 'linear|oscillating|unlimited',
-    saturation_mode: 'linear|oscillating|unlimited',
+    brightness_mode: 'linear|norepeat',
+    hue_mode: 'linear|norepeat',
+    saturation_mode: 'linear|norepeat',
     radial: false,
   }
   ring += area
+  ring.content_dy = ring.dx
   ringcount++
   ring.label = format("ring_%d", ringcount)
 
   var v = makeview(ring)
-  v.fullframe()
   v.content_x = 2
   v.content_y = 0
   v.framing = "repeatX|clipY"
