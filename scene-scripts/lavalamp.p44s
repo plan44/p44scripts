@@ -12,7 +12,7 @@
 // remove all existing subviews (blobs from previous runs)
 view.clear()
 view.configure({
-  framing: 'repeatX|clipY',
+  framing: 'clipX|clipY',
   bgcolor: '#001608', // yellow orange
 })
 
@@ -39,12 +39,13 @@ var sea = {
   radial: false,
 }
 sea += area
-sea.content_dy = sea.dx
+sea.content_dy = sea.dx/2+1
+sea.content_y = sea.dx/2
 sea.dy = 5
 var s = makeview(sea)
 view.addview(s)
 // make it "rocking" a bit with a continuously running back-and-forth animation of the rotation parameter
-s.animator('rotation').repeat(-1,true).step(0.05,1).from(-15).runto(15,20)
+s.animator('rotation').repeat(-1,true).step(0.05,1).from(-8).runto(8,20)
 
 var blobcount = 0
 var currentblobs = 0
@@ -75,9 +76,15 @@ while (true) {
   var v = makeview(blob)
   v.content_x = 5
   v.content_y = 5
-  v.framing = 'repeatX|clipY' // wrap around tube in X-direection
 
-  v.x = random(0, area.dx, 1) // random position somewhere around the tube
+  // tube
+  v.framing = 'repeatX|clipY' // wrap around tube in X-direection
+  v.x = random(0, area.dx, 1) // random position anywhere around the tube
+
+  // flat
+  //v.framing = 'clipX|clipY' // wrap around tube in X-direection
+  //v.x = random(2, area.dx-2, 1) // random position somewhere on the area, center >=2 pix from border
+
   view.addview(v)
 
   // further "life" of the blob view (moving up, sinking down again) now happens in a concurrent thread
