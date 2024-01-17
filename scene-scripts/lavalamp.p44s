@@ -52,10 +52,12 @@ var currentblobs = 0
 
 while (true) {
 
+  var dmin = min(area.dx, area.dy)
+  var blobsz = random(dmin/4, dmin/3, 1)
   var blob = {
     type: 'lightspot',
-    content_dx: 5,
-    content_dy: 5,
+    content_dx: blobsz,
+    content_dy: blobsz,
     color: hsv(random(15, 90, 1)), // orange to yellow
     bgcolor: '0000', // transparent background (important)
     alpha:200,
@@ -74,16 +76,16 @@ while (true) {
   blob.label = format("blob_%d", blobcount)
 
   var v = makeview(blob)
-  v.content_x = 5
-  v.content_y = 5
+  v.content_x = blobsz
+  v.content_y = blobsz
 
   // tube
-  v.framing = 'repeatX|clipY' // wrap around tube in X-direection
-  v.x = random(0, area.dx, 1) // random position anywhere around the tube
+  //v.framing = 'repeatX|clipY' // wrap around tube in X-direection
+  //v.x = random(0, area.dx, 1) // random position somewhere around the tube
 
   // flat
-  //v.framing = 'clipX|clipY' // wrap around tube in X-direection
-  //v.x = random(2, area.dx-2, 1) // random position somewhere on the area, center >=2 pix from border
+  v.framing = 'clipX|clipY' // wrap around tube in X-direection
+  v.x = random(-3, area.dx+3, 1)-blobsz // random position somewhere on the area, center >=2 pix from border
 
   view.addview(v)
 
@@ -91,10 +93,10 @@ while (true) {
   concurrent passing v {
     currentblobs++
     // move up
-    threadvar a = v.animator('scroll_y').function('easeout').from(10).runto(-area.dy+6,random(15,22))
+    threadvar a = v.animator('scroll_y').function('easeout').from(v.content_dy*2).runto(-area.dy+v.content_dy,random(15,22))
     await(a)
     // sink down again
-    a = v.animator('scroll_y').function('easein').runto(10,random(18,30))
+    a = v.animator('scroll_y').function('easein').runto(v.content_dy*2,random(18,30))
     await(a)
     // that's it for this blob, remove it
     v.remove()
