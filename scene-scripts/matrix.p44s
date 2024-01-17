@@ -1,0 +1,29 @@
+// "Matrix" (not yet, really needs improvement, but sort of...)
+
+// How to use:
+// - create a LED light of type "canvas" (set "Feature Config" to "stack")
+//   for this effect to appear
+// - put this script into a scene of your choice
+// - make sure the light has a non-zero brightness in this scene
+// - call the scene, the scene script will execute and generate the effect
+
+view.clear()
+
+concurrent
+{
+  while(true) {
+    // green with slightly random saturation and random brightness
+    view.color = hsv(120,random(0.7,1),random(0.4,1))
+    // random position
+    var x = random(0, view.dx-1)
+    var y = random(0, view.dy-1)
+    // random length
+    var l = random(3,15,1)
+    // draw sequence of l pixels in vertical direction
+    for (var i=l; i>0; i--) {
+      view.dot(x,y+i)
+    }
+    // wait a little
+    delay(0.1)
+  }
+}
