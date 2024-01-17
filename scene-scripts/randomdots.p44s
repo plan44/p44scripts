@@ -9,8 +9,7 @@
 
 view.clear()
 
-concurrent
-{
+concurrent {
   while(true) {
     view.color = rgb(random(0,255,1), random(0,255,1), random(0,255,1))
     view.dot(random(0,view.dx-1,1), random(0,view.dy-1,1))
