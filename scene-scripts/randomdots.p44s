@@ -1,0 +1,19 @@
+// Random color dots
+
+// How to use:
+// - create a LED light of type "canvas" (set "Feature Config" to "stack")
+//   for this effect to appear
+// - put this script into a scene of your choice
+// - make sure the light has a non-zero brightness in this scene
+// - call the scene, the scene script will execute and generate the effect
+
+view.clear()
+
+concurrent
+{
+  while(true) {
+    view.color = rgb(random(0,255,1), random(0,255,1), random(0,255,1))
+    view.dot(random(0,view.dx-1,1), random(0,view.dy-1,1))
+    delay(0.1)
+  }
+}
