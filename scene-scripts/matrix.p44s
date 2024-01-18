@@ -11,19 +11,40 @@ view.clear()
 
 concurrent
 {
+  var numstreaks = 0
   while(true) {
-    // green with slightly random saturation and random brightness
-    view.color = hsv(120,random(0.7,1),random(0.4,1))
-    // random position
-    var x = random(0, view.dx-1)
-    var y = random(0, view.dy-1)
-    // random length
-    var l = random(3,15,1)
-    // draw sequence of l pixels in vertical direction
-    for (var i=l; i>0; i--) {
-      view.dot(x,y+i)
+    concurrent {
+      numstreaks++
+      // greenish
+      threadvar sat = random(0.6,1)
+      threadvar hue = random(100,140,1)
+      // - trails has random brightness
+      threadvar bgcol = hsv(hue,sat,random(0.3,0.8))
+      // - drop is full brightness
+      threadvar dropcol = hsv(hue,sat,1)
+      // random start point and length
+      threadvar x = random(0, view.dx-1)
+      threadvar l = random(7,15,1)
+      threadvar y = random(l, view.dy-1)
+      // random speed
+      threadvar s = random(0.02,0.06)
+      // draw the drop and its trail
+      for (threadvar i=0; i<l; i++) {
+        if (i<l-1) {
+          // head: drop
+          view.color = dropcol
+          view.dot(x,y-i-1)
+        }
+        // trailing tail
+        view.color = bgcol
+        view.dot(x,y-i)
+        delay(s)
+      }
+      numstreaks--
     }
-    // wait a little
-    delay(0.1)
+    // how fast to start a new drop
+    delay(random(0.1,0.3))
+    // safety to prevent too many drops/threads in parallel
+    if (numstreaks>50) delay(10)
   }
 }
