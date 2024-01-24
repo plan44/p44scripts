@@ -1,0 +1,58 @@
+// Random (changing) Demo Effects
+// (including "Matrix", "randomdots" so far, maybe others later)
+
+// How to use:
+// - create a LED light of type "canvas" (set "Feature Config" to "stack")
+//   for this effect to appear
+// - put this script into a scene of your choice
+// - make sure the light has a non-zero brightness in this scene
+// - call the scene, the scene script will execute and generate the effect
+
+view.clear()
+
+concurrent
+{
+  var counter;
+  while (true) {
+    // new start of a round
+    // - select random event
+    var effect = random(0,1,1)
+    view.clear() // restart
+    if (effect==0) {
+      // "Color sparkle"
+      for(var counter=0; counter<3000; counter++) {
+        view.color = rgb(random(0,255,1), random(0,255,1), random(0,255,1))
+        view.dot(random(0,view.dx-1,1), random(0,view.dy-1,1))
+        delay(0.1)
+      }
+    }
+    else if (effect==1) {
+      var numstreaks = 0
+      for(var counter=0; counter<500; counter++) {
+        concurrent {
+          numstreaks++
+          threadvar sat = random(0.6,1)
+          threadvar hue = random(100,140,1)
+          threadvar bgcol = hsv(hue,sat,random(0.3,0.8))
+          threadvar dropcol = hsv(hue,sat,1)
+          threadvar x = random(0, view.dx-1, 1)
+          threadvar l = random(7,15,1)
+          threadvar y = random(l, view.dy-1, 1)
+          threadvar s = random(0.02,0.06)
+          for (threadvar i=0; i<l; i++) {
+            if (i<l-1) {
+              view.color = dropcol
+              view.dot(x,y-i-1)
+            }
+            view.color = bgcol
+            view.dot(x,y-i)
+            delay(s)
+          }
+          numstreaks--
+        }
+        delay(random(0.1,0.3))
+        if (numstreaks>50) delay(10)
+      }
+    }
+  }
+}
