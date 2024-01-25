@@ -2,7 +2,7 @@
 // (including "Matrix", "randomdots" so far, maybe others later)
 
 // How to use:
-// - create a LED light of type "canvas" (set "Feature Config" to "stack")
+// - create a LED light of type "canvas" (set "Feature Config" to "canvas")
 //   for this effect to appear
 // - put this script into a scene of your choice
 // - make sure the light has a non-zero brightness in this scene
