@@ -1,4 +1,6 @@
-// Random Sparkle
+// Random Demo effects with MIDI control
+
+// Note: this scene script needs FW x.7.0.37 or later
 
 // How to use:
 // - create a LED light of type "canvas" (set "Feature Config" to "stack")
@@ -6,6 +8,9 @@
 // - put this script into a scene of your choice
 // - make sure the light has a non-zero brightness in this scene
 // - call the scene, the scene script will execute and generate the effect
+// - if the global variable midi contains a midibus, the effect can
+//   be chosen by sending midi channel program change messages
+//   (0,1,..., 7 for random effect)
 
 view.clear()
 

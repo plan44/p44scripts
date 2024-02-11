@@ -1,6 +1,6 @@
 // "Metropolis"
 
-// Note: this version of the Lava-Lamp script needs FW x.7.0.36 or later
+// Note: this scene script needs FW x.7.0.36 or later
 
 // How to use:
 // - create a LED light of type "stack" (set "Feature Config" to "stack")

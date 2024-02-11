@@ -1,0 +1,17 @@
+// provide a global midi bus instance for use in other scripts
+
+// Depending on the device/computer this runs on, the device name
+// must be adapted
+
+glob midi
+
+// the if statement prevents initializing multiple times
+if (!isvalid(midi)) {
+  try {
+    midi = midibus('/dev/midi1') // standard device name for first USB-MIDI device connected to a Linux system
+    // midi = midibus('computer.hostname:2101') // when forwarding MIDI data stream via TCP/IP from another computer
+  }
+  catch as e {
+    log(4, "midi not available: %s", e)
+  }
+}

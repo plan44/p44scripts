@@ -1,0 +1,87 @@
+// "Blocks" game - controlled by MIDI
+
+// Note: this scene script needs FW x.7.0.38 or later
+
+// How to use:
+// - create a LED light of type "blocks" (set "Feature Config" to "blocks")
+//   for this effect to appear
+// - put this script into a scene of your choice
+// - make sure the light has a non-zero brightness in this scene
+// - call the scene, the scene script will execute and start the game
+
+// To make the MIDI control work, the device this plays on needs to have
+// a MIDI controller connected which can play MIDI notes 36..39
+// for left,turn,drop,right.
+// The MIDI bus interface must be instantiated in the "midi" global variable,
+// usually this is done in the mainscript, see mainscript-snippets/mainscript-midi-init.txt
+
+// Note: this is a very rough first version for testing the "blocks" view,
+//   which is an extract from pixelboardd (see github).
+
+view.clear()
+
+view.bgcolor = '#004' // dark blue
+var zoom=1
+view.dx=10*zoom
+view.dy=20*zoom
+view.zoom_x=zoom
+view.zoom_y=zoom
+view.brightness_mode='none'
+
+local function nextPiece()
+{
+  view.color=hsv(random(0,359,1))
+  var launched = view.launch(random(0,6,1), round(view.content_dx/2,2), random(0,3,1), 0.4, false)
+  if (!launched) {
+    gameOver()
+  }
+}
+
+local function startgame()
+{
+  view.clear()
+  nextPiece()
+}
+
+
+local function gameOver()
+{
+  view.bgcolor = '#F00'
+  delay(1)
+  view.bgcolor = '#004'
+}
+
+
+on (view.event()) as ev {
+  log("blocks event = %s", ev)
+  view.setdown()
+  while (true) {
+    var r = view.completedrow()
+    if (!isValid(r)) break;
+    view.color = '#FFF'
+    view.line(0,r,view.content_dx-1,r)
+    delay(0.1)
+    view.color = '#000'
+    view.line(0,r,view.content_dx-1,r)
+    delay(0.1)
+    view.color = '#FFF'
+    view.line(0,r,view.content_dx-1,r)
+    delay(0.1)
+    view.removerow(r)
+    delay(1)
+  }
+  delay(1)
+  nextPiece()
+}
+
+glob midi
+
+if (isvalid(midi)) {
+  on (midi.note(null,36,true)) { log("<"); view.move(-1,0,0); }
+  on (midi.note(null,37,true)) { log("R"); view.move(0,0,1); }
+  on (midi.note(null,38,true)) { log("v"); view.drop(0.03); }
+  on (midi.note(null,39,true)) { log(">"); view.move(1,0,0); }
+}
+
+
+startgame()
