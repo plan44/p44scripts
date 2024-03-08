@@ -34,111 +34,124 @@ lrg.addview(rightled)
 //rightled.animator('alpha').from(180).repeat(0,true).runto(255,3)
 //leftled.animator('alpha').from(255).repeat(0,true).runto(180,3)
 
+
 // setup motors
+var substeps = 2; // 1 or 2
+
 try {
-  system('insmod /flash/p44-stepper.ko stepper0=0,1,3,17,2,16 stepper1=0,1,5,11,4,15')
+  var mode = if(substeps==2, 1, 0)
+  system(format('insmod /flash/p44-stepper.ko stepper0=0,%d,3,17,2,16 stepper1=0,%d,5,11,4,15', mode, mode))
 }
 catch as e {
   log(4, "insmod err = %s", e)
 }
 
-var normalspeed =5000
-var slowspeed = 10000
+var cyclesteps = 4*substeps
 
-var min_to
+// speed are 1:1 for minutes, adapted for hours
+var normalspeed = 10000/substeps
+var slowspeed = 20000/substeps
+
+var min_cycles = 294.912
+var min_steps_diff = 0
+
+var min_pwr_to
 
 function moveminutes(mins, speed)
 {
-  var steps = mins * 2359; // ~ 294.912 * 8
+  var steps = mins*min_cycles*cyclesteps+min_steps_diff // actual number of steps needed
+  var effsteps = round(steps, cyclesteps) // round to full cycles
+  min_steps_diff = steps-effsteps; // number of steps we've missed
+  log("mins=%+f, steps=%.3f, effsteps=%d, diff=%.3f", mins, steps, effsteps, min_steps_diff)
   writefile('/sys/class/stepper/stepper0/stepinterval', speed)
   writefile('/sys/class/stepper/stepper0/currentstep', 0)
-  writefile('/sys/class/stepper/stepper0/targetstep', steps)
-  abort(min_to)
-  concurrent as min_to {
-    delay(30+10*mins)
+  writefile('/sys/class/stepper/stepper0/targetstep', effsteps)
+  // powerdown
+  /*
+  abort(min_pwr_to)
+  concurrent as min_pwr_to {
+    delay(10+15*mins)
     writefile('/sys/class/stepper/stepper0/power', 0)
   }
+  */
+}
+
+function minutesmoving()
+{
+  return number(readfile('/sys/class/stepper/stepper0/moving'))
 }
 
 
-var hr_to
+var hour_cycles = 122.88
+var hour_steps_diff = 0
+
+var hour_pwr_to
 
 function movehours(hours, speed)
 {
-  var steps = hours * 983; // ~ 122.88 * 8
-  writefile('/sys/class/stepper/stepper1/stepinterval', speed)
+  var steps = hours*hour_cycles*cyclesteps+hour_steps_diff // actual number of steps needed including last error
+  var effsteps = round(steps, cyclesteps) // round to full cycles
+  hour_steps_diff = steps-effsteps; // number of steps we've missed
+  log("hours=%+.1f, steps=%.3f, effsteps=%d, diff=%.3f", hours, steps, effsteps, hour_steps_diff)
+  writefile('/sys/class/stepper/stepper1/stepinterval', round(speed*min_cycles/hour_cycles))
   writefile('/sys/class/stepper/stepper1/currentstep', 0)
-  writefile('/sys/class/stepper/stepper1/targetstep', steps)
-  abort(hr_to)
-  concurrent as hr_to {
-    delay(30+10*hours)
+  writefile('/sys/class/stepper/stepper1/targetstep', effsteps)
+  // powerdown
+  /*
+  abort(hour_pwr_to)
+  concurrent as hour_pwr_to {
+    delay(10+15*hours)
     writefile('/sys/class/stepper/stepper1/power', 0)
   }
+  */
+}
+
+function hoursmoving()
+{
+  return number(readfile('/sys/class/stepper/stepper1/moving'))
 }
 
 
-var manualmode = false
-
 on (every(0:01, 0:01)) {
-  if (!manualmode) moveminutes(1, normalspeed)
+  log ('every minute')
+  if (!minutesmoving()) moveminutes(1, normalspeed)
 }
 
 on (every(1:00, 1:00)) {
-  if (!manualmode) movehours(1, normalspeed)
+  log ('every hour')
+  if (!hoursmoving()) movehours(1, normalspeed)
 }
 
-
-var manual_to
-
-function manualop()
-{
-  manualmode = true
-  abort(manual_to)
-  concurrent as manual_to {
-    delay(15)
-    manualmode = false
-  }
-}
 
 
 var leftbutton = device('leftbutton').button(0)
-var leftheld = false
 
 on (leftbutton) evaluating as clicks {
   log("left button click = %d", clicks)
   if (clicks==1) {
-    movehours(1, normalspeed);
-    manualop()
+    if (!hoursmoving()) movehours(1, normalspeed);
   }
   else if (clicks==5) {
-    movehours(1, slowspeed);
-    leftheld = true
-    manualmode = true
+    if (!hoursmoving()) movehours(1, slowspeed);
   }
-  else if (clicks==0 && leftheld) {
+  else if (clicks==0) {
+    // stop
     movehours(0, slowspeed);
-    leftheld = false
-    manualmode = false
   }
 }
 
 var rightbutton = device('rightbutton').button(0)
-var rightheld = false
 
 on (rightbutton) evaluating as clicks {
   log("right button click = %d", clicks)
   if (clicks==1) {
-    moveminutes(1, normalspeed);
-    manualop()
+    if (!minutesmoving()) moveminutes(1, normalspeed);
   }
   else if (clicks==5) {
-    moveminutes(1, slowspeed);
-    rightheld = true
-    manualmode = true
+    if (!minutesmoving()) moveminutes(1, slowspeed);
   }
   else if (clicks==0 && rightheld) {
+    // stop
     moveminutes(0, slowspeed);
-    rightheld = false
-    manualmode = false
   }
 }
