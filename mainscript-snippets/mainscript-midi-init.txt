@@ -8,8 +8,14 @@ glob midi
 // the if statement prevents initializing multiple times
 if (!isvalid(midi)) {
   try {
-    midi = midibus('/dev/midi1') // standard device name for first USB-MIDI device connected to a Linux system
-    // midi = midibus('computer.hostname:2101') // when forwarding MIDI data stream via TCP/IP from another computer
+    // virtual ALSA midi device, which by default on P44-LC-X is connected to
+    // the RTP MIDI daemon, to make it available over the network
+    // connection (and for example visible in macOS "Audio MIDI Setup" app).
+    midi = midibus('/dev/snd/midiC0D0')
+    // MIDI device connected locally via USB
+    //midi = midibus('/dev/midi1') // standard device name for first USB-MIDI device connected to a Linux system
+    // Connection via direct TCP stream (serialfwd)
+    //midi = midibus('computer.hostname:2101') // when forwarding MIDI data stream via TCP/IP from another computer
   }
   catch as e {
     log(4, "midi not available: %s", e)
