@@ -62,7 +62,7 @@ function moveminutes(mins, speed)
   var steps = mins*min_cycles*cyclesteps+min_steps_diff // actual number of steps needed
   var effsteps = round(steps, cyclesteps) // round to full cycles
   min_steps_diff = steps-effsteps; // number of steps we've missed
-  log("mins=%+f, steps=%.3f, effsteps=%d, diff=%.3f", mins, steps, effsteps, min_steps_diff)
+  log("mins=%+f, steps=%.3f, effsteps=%d, diff=%.3f, speed=%d", mins, steps, effsteps, min_steps_diff, speed)
   writefile('/sys/class/stepper/stepper0/stepinterval', speed)
   writefile('/sys/class/stepper/stepper0/currentstep', 0)
   writefile('/sys/class/stepper/stepper0/targetstep', effsteps)
@@ -92,7 +92,7 @@ function movehours(hours, speed)
   var steps = hours*hour_cycles*cyclesteps+hour_steps_diff // actual number of steps needed including last error
   var effsteps = round(steps, cyclesteps) // round to full cycles
   hour_steps_diff = steps-effsteps; // number of steps we've missed
-  log("hours=%+.1f, steps=%.3f, effsteps=%d, diff=%.3f", hours, steps, effsteps, hour_steps_diff)
+  log("hours=%+.1f, steps=%.3f, effsteps=%d, diff=%.3f, speed=%d", hours, steps, effsteps, hour_steps_diff, speed)
   writefile('/sys/class/stepper/stepper1/stepinterval', round(speed*min_cycles/hour_cycles))
   writefile('/sys/class/stepper/stepper1/currentstep', 0)
   writefile('/sys/class/stepper/stepper1/targetstep', effsteps)
@@ -136,7 +136,8 @@ on (leftbutton) evaluating as clicks {
   }
   else if (clicks==0) {
     // stop
-    movehours(0, slowspeed);
+    movehours(0, slowspeed)
+    hour_steps_diff = 0
   }
 }
 
@@ -150,8 +151,9 @@ on (rightbutton) evaluating as clicks {
   else if (clicks==5) {
     if (!minutesmoving()) moveminutes(1, slowspeed);
   }
-  else if (clicks==0 && rightheld) {
+  else if (clicks==0) {
     // stop
-    moveminutes(0, slowspeed);
+    moveminutes(0, slowspeed)
+    min_steps_diff = 0
   }
 }
