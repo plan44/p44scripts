@@ -112,12 +112,12 @@ function hoursmoving()
 }
 
 
-on (every(0:01, 0:01)) {
+on (every(0:01:00, 0:00:50)) {
   log ('every minute')
   if (!minutesmoving()) moveminutes(1, normalspeed)
 }
 
-on (every(1:00, 1:00)) {
+on (every(1:00:00, 0:59:50)) {
   log ('every hour')
   if (!hoursmoving()) movehours(1, normalspeed)
 }
