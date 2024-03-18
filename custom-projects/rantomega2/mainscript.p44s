@@ -1,4 +1,4 @@
-// Rantomega2 default main script: WORK IN PROGRESS
+// Rantomega2 default main script: BASIC FUNCTIONALITY, no LED effects yet
 
 removeledchains()
 addledchain("WS2813.GRB:/dev/ledchain1:2:0:2:0:1") // two LEDs
@@ -67,13 +67,11 @@ function moveminutes(mins, speed)
   writefile('/sys/class/stepper/stepper0/currentstep', 0)
   writefile('/sys/class/stepper/stepper0/targetstep', effsteps)
   // powerdown
-  /*
   abort(min_pwr_to)
   concurrent as min_pwr_to {
-    delay(10+15*mins)
+    delay(mins*13*speed/normalspeed)
     writefile('/sys/class/stepper/stepper0/power', 0)
   }
-  */
 }
 
 function minutesmoving()
@@ -97,13 +95,11 @@ function movehours(hours, speed)
   writefile('/sys/class/stepper/stepper1/currentstep', 0)
   writefile('/sys/class/stepper/stepper1/targetstep', effsteps)
   // powerdown
-  /*
   abort(hour_pwr_to)
   concurrent as hour_pwr_to {
-    delay(10+15*hours)
+    delay(hours*13*speed/normalspeed)
     writefile('/sys/class/stepper/stepper1/power', 0)
   }
-  */
 }
 
 function hoursmoving()
