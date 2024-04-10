@@ -69,11 +69,11 @@ function manualAbsTime(time)
 }
 
 
-function manualCalibration(newCalRun)
+function manualCalibration(absdiff)
 {
   concurrent {
     actualabsolute = null
-    calibrationRun(newCalRun)
+    calibrationRun(absdiff)
   }
   log(3,"Started manual calibration with unknown absolute position in background")
 }
@@ -97,9 +97,8 @@ function setAbsolute(newAbsPos)
   }
   // set the new position
   actualabsolute = newAbsPos
-  // reference for next regulation is the current count, so get it and then regulate
-  lastcount = number(readfile('/sys/class/counter/counter0/counter'))
-  regulate()
+  // restart regulation
+  regulate(true)
 }
 
 
@@ -125,8 +124,9 @@ function initialCalibration()
 }
 
 
-function calibrationRun(newCalRun)
+function calibrationRun(absdiff)
 {
+  var newCalRun = if (absdiff>0, 1, -1)
   if (newCalRun!=calRun) {
     calRun = newCalRun
     if (calrun<0 && abs(absdiff)<maxWaitCount) {
@@ -150,8 +150,7 @@ function calibrationcheck(expected, actual)
   // now check if we want to calibrate
   if (abs(absdiff)>=minCalibrationCountDiff) {
     // need calibration run
-    var newCalRun = if (absdiff>0, 1, -1)
-    calibrationRun(newCalRun)
+    calibrationRun(absdiff)
     log(5, "calibrating: remaining count difference %+d, realtime = %s, currentshow = %s", absdiff, formattime(expected/countsPerSecond), formattime(actual/countsPerSecond))
     return false
   }
@@ -167,8 +166,10 @@ function calibrationcheck(expected, actual)
 
 
 var regulationlock = lock()
+var lastsp default null
 
-function regulate()
+
+function regulate(restart)
 {
   if (!regulationlock.enter(20)) {
     log(3,"regulate: regulation locked >20 secs")
@@ -176,6 +177,12 @@ function regulate()
   }
   var actualcount = number(readfile('/sys/class/counter/counter0/counter'))
   var thisRegulation = epochtime()
+  // reset?
+  if (restart) {
+    lastRegulation = thisRegulation
+    lastcount = actualcount
+  }
+  // now regulate
   var period = thisRegulation-lastRegulation
   var counts = actualcount-lastcount
   if (testing) {
@@ -204,46 +211,38 @@ function regulate()
       }
     }
     if (calRun==0) {
-      log("- expectedcount=%d, actualcount=%d (%+d, freq=%.3f)",
-        expectedcount, actualcount, counts, counts/period
+      log("- expectedcount=%d, actualcount=%d (%+d, freq=%.3f), diff=%d",
+        expectedcount, actualcount, counts, counts/period, countdiff
       )
       log("  absolute count/time expected=%d (%s), actual=%s (%s)",
         expectedabsolute, formattime(expectedabsolute/countsPerSecond),
         actualabsolute, formattime(actualabsolute/countsPerSecond)
       )
-      // normal clock mode, just adjust speed
-      // - expected count when clock runs normally
+      // Normal clock mode: update expected count by time passed
       if (isvalid(lastRegulation)) {
         expectedcount += countsPerSecond*period
       }
+      // normal clock mode, just adjust speed
       if (abs(countdiff)>=minAdjustCountDiff) {
         // calculate correction
-        var sp = aout.value()
+        var sp
         if (countdiff>0) {
           // running too fast
           sp = -1 // stop
-          /*
-          sp -= round(countdiff/minAdjustCountDiff)
-          */
         }
         else {
           // running too slow
           sp = 5 // catch up, more silent than sp=0,1,2
-          /*
-          if (motor_start.state()==false) {
-            sp = 0
+        }
+        if (sp!=lastsp) {
+          lastsp = sp
+          log("  adjusting speed/aout=%s", if(sp<0, "STOP", sp))
+          if (sp<0) {
+            stop()
           }
           else {
-            sp += round(-countdiff/minAdjustCountDiff)
+            run(sp)
           }
-          */
-        }
-        log("adjusting: countdiff=%d, new speed/aout=%s", countdiff, if(sp<0, "STOP", sp))
-        if (sp<0) {
-          stop()
-        }
-        else {
-          run(sp)
         }
       }
     }
@@ -327,20 +326,13 @@ function restartClock(knowndiff)
 {
   log(4, "re-start normal clock operation with known counter diff = %d", knowndiff)
   stop()
-  if (!regulationlock.enter(0:01)) {
-    log(3,"restartclock: regulation locked >1 min secs")
-  }
   // no calibration
   calRun = 0
   // reset the pulse counter (real and expectation)
   expectedcount = knowndiff
   writefile('/sys/class/counter/counter0/counter', 0)
-  delay(0.2)
-  // start regulating NOW
-  lastRegulation = epochtime()
-  lastcount = 0
-  regulationlock.leave()
-  run(0, false) // start forward at slowest speed
+  // restart regulation
+  regulate(true)
 }
 
 
@@ -349,7 +341,7 @@ function startClock()
   if (!testing) {
     log(4, "start clock")
     // delay(30) // await correct NTP time
-    restartclock(0)
+    restartclock(minAdjustCountDiff) // make sure we start
     log(3, "!!! enable autocalibration later")
     //initialCalibration()
   }
@@ -363,7 +355,7 @@ startClock();
 
 // speed regulation
 on (every(regIntvl, regIntvl)) {
-  regulate()
+  regulate(false)
 }
 
 var lastreed default 0
@@ -373,10 +365,11 @@ var reedlock = lock()
 on (every(reedIntvl)) {
   if (reedlock.enter()) {
     var reedpos = reed_bus.value()
+    log(6, "reed=0x%x", reedpos)
     if (reedpos!=lastreed) {
-      log("reed=0x%x", reedpos)
       // collect all bits, only report when all are gone
       if (reedpos>lastreed) {
+        log("more reed bits = 0x%x", reedpos)
         lastreed = reedpos
       }
       else if (reedpos==0) {
