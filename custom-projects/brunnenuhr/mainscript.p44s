@@ -34,14 +34,15 @@ reed_bus = digitalbus('(+/i2c0.MCP23017@24.)15,14,13', false, 0)
 // MARK: - operational constants
 
 var testing = false // if set, nothing happens automatically
-var reedIntvl = 5 // seconds
-var regIntvl = 15 // seconds
+var regIntvl = 10 // seconds
 var countsPerSecond = 6.4491 // Hz, theoretical value from Motor table
 var countsPerTurn = countsPerSecond*60*60 * 12
-var minAdjustCountDiff = 100 // do normal clock speed adjusting when difference is more than that
-var minCalibrationCountDiff = 1000 // do actual calibration (high speed run nearest way) when absolute difference is more than that
-var calibrationSpeed = 85 // 0..100, speed used for calibration, will be programmed into motor
-var maxRegSpeed = 10 // max speed that will be applied directly. Everything above uses programmed speed
+var adjustCountDiff = 100 // do normal clock speed adjusting when difference is more than that
+var clockSpeed = 5 // normal running speed for clock
+var startCalibrationCountDiff = 1000 // start actual calibration (high speed run nearest way) when absolute difference is more than that
+var stopCalibrationCountDiff = 200 // stop calibration run when difference falls below this
+var calibrationSpeed = 100 // 0..100, speed used for calibration, will be programmed into motor
+var maxRegSpeed = 30 // max speed that will be applied directly. Everything above uses programmed speed
 var maxWaitCount = countsPerTurn/8 // wait max 1.5 hours instead of reverse run
 
 // reed positions in counts
@@ -58,37 +59,9 @@ var pos = [
 // show marker pos
 foreach pos as i,p { log(4,"Marker #%d = %s", i, formattime(p/countsPerSecond)) }
 
-// MARK: - Service Functions
-
-function manualAbsTime(time)
-{
-  concurrent {
-    setAbsolute(cyclic(time*countsPerSecond, 0, countsPerTurn))
-  }
-}
-
-
-function manualCalibration(absdiff)
-{
-  concurrent {
-    actualabsolute = null
-    calibrationRun(absdiff)
-  }
-  log(3,"Started manual calibration with unknown absolute position in background")
-}
-
-
-function manualRun(speed, reverse)
-{
-  concurrent {
-    run(speed, reverse)
-  }
-}
-
-
 // MARK: - Internal Functions
 
-var actualabsolute default null
+var positionknown default false // if true, we (approximately) know the position
 
 
 function getCounter()
@@ -97,17 +70,32 @@ function getCounter()
 }
 
 
+function setCounter(newCount)
+{
+  calibrationRun(0)
+  writefile('/sys/class/counter/counter0/counter', string(cyclic(newCount, 0, countsPerTurn)))
+  lastcount = newCount
+}
+
+
+// @return absolute count that would be correct for current time
+function expectedCount()
+{
+  return cyclic(timeofday()*countsPerSecond, 0, countsPerTurn)
+}
+
+
 function setAbsolute(newAbsPos)
 {
-  log(4, "setting new absolute position from marker: count=%d (%s)", newAbsPos, formattime(newAbsPos/countsPerSecond))
+  log(4, "setting absolute count=%d (%s)", newAbsPos, formattime(newAbsPos/countsPerSecond))
   // - if we already had one before, report difference
-  if (isvalid(actualabsolute)) {
-    log(4, "- estimated absolute position from counting was: %d (%s, %+d)", actualabsolute, formattime(actualabsolute/countsPerSecond), actualabsolute-newAbsPos)
+  if (isvalid(positionknown)) {
+    var countnow = getCounter()
+    log(4, "- previously known absolute count was: %d (%s, %+d)", countnow, formattime(countnow/countsPerSecond), countnow-newAbsPos)
   }
-  // set the new position
-  actualabsolute = newAbsPos
-  // restart regulation
-  regulate(true)
+  // - set counter to the new position
+  setCounter(newAbsPos)
+  positionknown = true
 }
 
 
@@ -120,146 +108,124 @@ function markerDetected(marker, reverse)
 }
 
 
-var lastRegulation default null
-var lastcount default null
 var calRun = 0 // 0=not calibrating, 1=forward run, -1=reverse run
 
 
 function initialCalibration()
 {
   // just start running
-  log(4, "Initial calibration: run forward until first marker hit", absdiff)
+  log(4, "Initial calibration: forget known position, run forward until first marker hit")
+  positionknown = false
   calibrationRun(1)
 }
 
 
 function calibrationRun(absdiff)
 {
-  var newCalRun = if (absdiff>0, 1, -1)
+  var newCalRun = if (absdiff==0, 0, if (absdiff>0, 1, -1))
   if (newCalRun!=calRun) {
     calRun = newCalRun
     if (calrun<0 && abs(absdiff)<maxWaitCount) {
       log(4, "Calibrate by AWAITING time to catch up")
       stop()
     }
-    else {
+    else if (calRun!=0) {
       log(4, "Starting  %s calibration run", if(calRun>0, "FORWARD", "REVERSE"))
       run(calibrationSpeed, calRun<0)
     }
-  }
-}
-
-
-function calibrationcheck(expected, actual)
-{
-  var absdiff = expected-actual // + if we need forward correction
-  // correct for shorter way
-  if (absdiff>countsPerTurn/2) absdiff-=countsPerTurn
-  else if (absdiff<-countsPerTurn/2) absdiff+=countsPerTurn;
-  // now check if we want to calibrate
-  if (abs(absdiff)>=minCalibrationCountDiff) {
-    // need calibration run
-    calibrationRun(absdiff)
-    log(5, "calibrating: remaining count difference %+d, realtime = %s, currentshow = %s", absdiff, formattime(expected/countsPerSecond), formattime(actual/countsPerSecond))
-    return false
-  }
-  else {
-    // difference is ok
-    if (calRun!=0) {
-      log(4, "Ending calibration, remaining count diff = %d", absdiff)
-      restartClock(absdiff)
+    else {
+      log(4, "End of calibration run")
+      stop()
     }
-    return true // counter might have changed
   }
 }
 
 
-var regulationlock = lock()
-var lastsp default null
+var lastcount = 0
+var lastreg = epochtime()
 
-
-function regulate(restart)
+function regulate()
 {
-  if (!regulationlock.enter(20)) {
-    log(3,"regulate: regulation locked >20 secs")
-    return
-  }
-  var actualcount = number(readfile('/sys/class/counter/counter0/counter'))
-  var thisRegulation = epochtime()
-  // reset?
-  if (restart) {
-    lastRegulation = thisRegulation
-    lastcount = actualcount
-  }
-  // now regulate
-  var period = thisRegulation-lastRegulation
-  var counts = actualcount-lastcount
+  // current state
+  var expected = expectedCount()
+  var actual = getCounter()
+  var catchup = expected-actual
+  var absdiff = abs(catchup)
+  var thisreg = epochtime()
+  var period = thisreg-lastreg
+  var counts = actual-lastcount
+  // update for next
+  lastcount = actual
+  lastreg = thisreg
+  // regulate
   if (testing) {
-    log(3, "regulate: TESTING -> NOP. Counter = %d, counts=%+d, freq=%.3f", actualcount, counts, counts/period)
+    log(3, "regulate: TESTING -> NOP. Counter = %d, counts=%+d, freq=%.3f", actual, counts, counts/period)
+  }
+  else if (positionknown) {
+    if (calRun!=0) {
+      // already calibrating
+      if (if(calrun>0, catchup<stopCalibrationCountDiff, catchup>-stopCalibrationCountDiff)) {
+        // close enough or past, stop calibration
+        calibrationRun(0)
+      }
+    }
+    else {
+      // not calibrating right now
+      if (absdiff>=startCalibrationCountDiff) {
+        // need calibration
+        calibrationRun(catchup)
+      }
+      else {
+        // normal run, just start/stop
+        if (catchup > adjustCountDiff) {
+          // we're behind, start motor
+          run(clockSpeed, false)
+        }
+        else if (catchup < -adjustCountDiff) {
+          // we're too far, stop motor
+          stop()
+        }
+      }
+    }
+    // known position
+    log("- expected=%d (%s), counter=%d (%s), %s by %d counts (%s)",
+      expected, formattime(expected/countsPerSecond),
+      actual, formattime(cyclic(actual/countsPerSecond, 0, countsPerTurn)),
+      if(catchup>0, "late", "early"), absdiff, formattime(absdiff/countsPerSecond)
+    )
   }
   else {
-    // difference for normal clock
-    var countdiff = actualcount-expectedcount
-    // handle approaching signed 32bit int overflow before the fact
-    if (actualcount>2E9) {
-      log(4, "preventing counter overflow")
-      writefile('/sys/class/counter/counter0/counter', 0)
-      expectedcount = -countdiff
-    }
-    // check absolute position
-    // - expected absolute count derives from timeofday
-    var expectedabsolute = cyclic(timeofday()*countsPerSecond, 0, countsPerTurn)
-    if (isvalid(actualabsolute)) {
-      // we know the mechanical position
-      // - update absolute with wrap around, depending on current running direction
-      var absAdv = counts
-      actualabsolute = cyclic(actualabsolute+absAdv, 0, countsPerTurn)
-      if (calibrationcheck(expectedabsolute, actualabsolute)) {
-        // calibration might have reset the counter
-        actualcount = number(readfile('/sys/class/counter/counter0/counter'))
-      }
-    }
-    if (calRun==0) {
-      log("- expectedcount=%d, actualcount=%d (%+d, freq=%.3f), diff=%d",
-        expectedcount, actualcount, counts, counts/period, countdiff
-      )
-      log("  absolute count/time expected=%d (%s), actual=%s (%s)",
-        expectedabsolute, formattime(expectedabsolute/countsPerSecond),
-        actualabsolute, formattime(actualabsolute/countsPerSecond)
-      )
-      // Normal clock mode: update expected count by time passed
-      if (isvalid(lastRegulation)) {
-        expectedcount += countsPerSecond*period
-      }
-      // normal clock mode, just adjust speed
-      if (abs(countdiff)>=minAdjustCountDiff) {
-        // calculate correction
-        var sp
-        if (countdiff>0) {
-          // running too fast
-          sp = -1 // stop
-        }
-        else {
-          // running too slow
-          sp = 5 // catch up, more silent than sp=0,1,2
-        }
-        if (sp!=lastsp) {
-          lastsp = sp
-          log("  adjusting speed/aout=%s", if(sp<0, "STOP", sp))
-          if (sp<0) {
-            stop()
-          }
-          else {
-            run(sp)
-          }
-        }
-      }
-    }
+    // unknown position
+    log("- expected=%d (%s), POSITION UNKNOWN counter=%d",
+      expected, formattime(expected/countsPerSecond), actual
+    )
   }
-  // run done, update references
-  lastRegulation = thisRegulation
-  lastcount = actualcount
-  regulationlock.leave()
+  log("  counted %+d in %.2f S - count frequency = %.2f Hz",
+    counts, period, if(period>0,counts/period,0)
+  )
+}
+
+
+var lastreed default 0
+var maxreed default 0
+
+function checkReed()
+{
+  // check reed
+  var reedpos = reed_bus.value()
+  if (reedpos!=lastreed) {
+    log(5, "reed=0x%x", reedpos)
+    // collect all bits, only report when all are gone
+    if (reedpos>maxreed) {
+      log("more reed bits = 0x%x", reedpos)
+      maxreed = reedpos
+    }
+    else if (reedpos==0) {
+      markerDetected(maxreed, lastreverse)
+      maxreed = 0 // reset, so new bits need to come and go before triggering again
+    }
+    lastreed = reedpos
+  }
 }
 
 
@@ -282,7 +248,10 @@ function applyStop()
 function stop()
 {
   if (!runlock.enter(30)) {
-    log(3,"runlock blocked for >30 sec")
+    log(3,"runlock blocked for >30 sec -> STILL STOPPING RIGHT NOW")
+  }
+  if (motor_start.state()) {
+    log(5, "motor STOPS")
   }
   applyStop()
   runlock.leave()
@@ -314,34 +283,34 @@ function run(speed, reverse)
   // must not overlap with stop
   if (!runlock.enter(30)) {
     log(3,"runlock blocked for >30 sec")
+    return
   }
   var reversing = if(isvalid(lastreverse), reverse!=lastreverse, true)
   var newspeed = if(isvalid(lastspeed), speed!=lastspeed, true)
   // from here on, we are re-entrant
   if (reversing || newspeed) {
-    log(6, "initiating: speed=%d, reverse=%d", speed, reverse)
     // actual change
     applyStop()
-    delay(if(reversing, 6, 1)) // wait long for direction change, so motor can actually stop
+    delay(if(reversing, 2, 0.5)) // wait long for direction change, so motor can actually stop
     // set counter direction
     writefile('/sys/class/counter/counter0/countmode', if(reverse, 0x01, 0x00))
     // update debounce time (~11hz -> 75mS .. ~90Hz -> 8mS)
-    writefile('/sys/class/counter/counter0/debounce', maprange(speed, 5, 100, 75000, 8000))
+    writefile('/sys/class/counter/counter0/debounce', maprange(if(speed>maxRegSpeed, calibrationSpeed, speed), 5, 100, 75000, 8000))
     // direction
     motor_l_r.state(!(reverse==true))
     delay(0.1)
     // speed
     if (speed>maxRegSpeed) {
       // set=false, start=true: use programmed speed, auto-ramping
-      log(6, "starting with programmed speed > %d", maxRegSpeed)
+      log(5, "motor starts %s with programmed calibration speed", if(reverse, "REVERSE", "FORWARD"))
       motor_set.state(false)
       motor_start.state(true)
     }
     else {
       // set=true, start=true: use direct speed control, no ramp
-      log(6, "starting with direct speed control = %d", speed)
+      log(5, "motor starts %s with direct control, speed = %d", if(reverse, "REVERSE", "FORWARD"), speed)
       aout.value(speed)
-      delay(1) // settle
+      delay(0.3) // settle
       motor_set.state(true)
       motor_start.state(true)
     }
@@ -355,31 +324,42 @@ function run(speed, reverse)
 
 // MARK: - startup
 
-var expectedcount default 0
-
-function restartClock(knowndiff)
-{
-  log(4, "re-start normal clock operation with known counter diff = %d", knowndiff)
-  stop()
-  // no calibration
-  calRun = 0
-  // reset the pulse counter (real and expectation)
-  expectedcount = knowndiff
-  writefile('/sys/class/counter/counter0/counter', 0)
-  // restart regulation
-  regulate(true)
-}
-
-
 function startClock()
 {
   if (!testing) {
     log(4, "start clock")
     // delay(30) // await correct NTP time
-    //log(3, "!!! enable autostart AND REGULATION again")
-    restartclock(minAdjustCountDiff) // make sure we start
     log(3, "!!! enable autocalibration later")
     //initialCalibration()
+    run(clockSpeed, false)
+  }
+}
+
+// MARK: - Service Functions
+
+// @set known position from observed time shown by the clock scale
+function manuallyObservedTime(time)
+{
+  concurrent {
+    setAbsolute(cyclic(time*countsPerSecond, 0, countsPerTurn))
+  }
+}
+
+
+function manualCalibration(absdiff)
+{
+  concurrent {
+    calRun = null
+    calibrationRun(absdiff)
+  }
+  log(3,"Started manual calibration")
+}
+
+
+function manualRun(speed, reverse)
+{
+  concurrent {
+    run(speed, reverse)
   }
 }
 
@@ -389,33 +369,18 @@ function startClock()
 // program calibration speed as hispeed into motor
 programHiSpeed(calibrationSpeed)
 
+// reset counter
+setCounter(0)
+
 // start running
 startClock();
 
-// speed regulation
-on (every(regIntvl, regIntvl)) {
-  regulate(false)
-}
+// regulation and reed contact sampling
+var handling = false
 
-var lastreed default 0
-var reedlock = lock()
-
-// reed contact sampling
-on (every(reedIntvl)) {
-  if (reedlock.enter()) {
-    var reedpos = reed_bus.value()
-    log(6, "reed=0x%x, counter=%d", reedpos, getCounter())
-    if (reedpos!=lastreed) {
-      // collect all bits, only report when all are gone
-      if (reedpos>lastreed) {
-        log("more reed bits = 0x%x", reedpos)
-        lastreed = reedpos
-      }
-      else if (reedpos==0) {
-        markerDetected(lastreed, lastreverse)
-        lastreed = 0 // reset, so new bits need to come and go before triggering again
-      }
-    }
-    reedlock.leave()
-  }
+on (every(regIntvl) & !handling) {
+  handling = true
+  checkReed()
+  regulate()
+  handling = false
 }
