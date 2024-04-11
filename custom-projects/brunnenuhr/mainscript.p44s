@@ -40,7 +40,8 @@ var countsPerSecond = 6.4491 // Hz, theoretical value from Motor table
 var countsPerTurn = countsPerSecond*60*60 * 12
 var minAdjustCountDiff = 100 // do normal clock speed adjusting when difference is more than that
 var minCalibrationCountDiff = 1000 // do actual calibration (high speed run nearest way) when absolute difference is more than that
-var calibrationSpeed = 100 // 0..100 for analog out speed control
+var calibrationSpeed = 85 // 0..100, speed used for calibration, will be programmed into motor
+var maxRegSpeed = 10 // max speed that will be applied directly. Everything above uses programmed speed
 var maxWaitCount = countsPerTurn/8 // wait max 1.5 hours instead of reverse run
 
 // reed positions in counts
@@ -57,9 +58,7 @@ var pos = [
 // show marker pos
 foreach pos as i,p { log(4,"Marker #%d = %s", i, formattime(p/countsPerSecond)) }
 
-// MARK: - Functions
-
-var actualabsolute default null
+// MARK: - Service Functions
 
 function manualAbsTime(time)
 {
@@ -86,6 +85,16 @@ function manualRun(speed, reverse)
   }
 }
 
+
+// MARK: - Internal Functions
+
+var actualabsolute default null
+
+
+function getCounter()
+{
+  return number(readfile('/sys/class/counter/counter0/counter'))
+}
 
 
 function setAbsolute(newAbsPos)
@@ -203,7 +212,7 @@ function regulate(restart)
     if (isvalid(actualabsolute)) {
       // we know the mechanical position
       // - update absolute with wrap around, depending on current running direction
-      var absAdv = if(lastreverse, -1, 1)*counts
+      var absAdv = counts
       actualabsolute = cyclic(actualabsolute+absAdv, 0, countsPerTurn)
       if (calibrationcheck(expectedabsolute, actualabsolute)) {
         // calibration might have reset the counter
@@ -256,65 +265,91 @@ function regulate(restart)
 
 // MARK: - motor control
 
-var lastspeed default null
+var lastspeed default -1 // stopped
 var lastreverse default null
 var runlock = lock()
 
 function applyStop()
 {
+  // first remove start to avoid programming speed
   delay(0.1)
   motor_start.state(false)
   delay(0.1)
   motor_set.state(false)
+  lastspeed = -1
 }
 
 function stop()
 {
-  lastspeed = null
+  if (!runlock.enter(30)) {
+    log(3,"runlock blocked for >30 sec")
+  }
   applyStop()
+  runlock.leave()
+}
+
+
+function programHiSpeed(hispeed)
+{
+  if (runlock.enter(0)) {
+    log(4,"programming high speed=%d", hispeed)
+    applyStop()
+    aout.value(hispeed)
+    delay(1) // settle
+    motor_set.state(true)
+    motor_start.state(true)
+    delay(0.1)
+    motor_set.state(false) // program!
+    motor_start.state(false)
+    runlock.leave()
+  }
 }
 
 
 function run(speed, reverse)
 {
-  // to make sure
+  // defaults
   if (!isvalid(reverse)) var reverse = false
+  if (!isvalid(speed)) var speed = 5
+  // must not overlap with stop
   if (!runlock.enter(30)) {
     log(3,"runlock blocked for >30 sec")
   }
   var reversing = if(isvalid(lastreverse), reverse!=lastreverse, true)
   var newspeed = if(isvalid(lastspeed), speed!=lastspeed, true)
+  // from here on, we are re-entrant
+  if (reversing || newspeed) {
+    log(6, "initiating: speed=%d, reverse=%d", speed, reverse)
+    // actual change
+    applyStop()
+    delay(if(reversing, 6, 1)) // wait long for direction change, so motor can actually stop
+    // set counter direction
+    writefile('/sys/class/counter/counter0/countmode', if(reverse, 0x01, 0x00))
+    // update debounce time (~11hz -> 75mS .. ~90Hz -> 8mS)
+    writefile('/sys/class/counter/counter0/debounce', maprange(speed, 5, 100, 75000, 8000))
+    // direction
+    motor_l_r.state(!(reverse==true))
+    delay(0.1)
+    // speed
+    if (speed>maxRegSpeed) {
+      // set=false, start=true: use programmed speed, auto-ramping
+      log(6, "starting with programmed speed > %d", maxRegSpeed)
+      motor_set.state(false)
+      motor_start.state(true)
+    }
+    else {
+      // set=true, start=true: use direct speed control, no ramp
+      log(6, "starting with direct speed control = %d", speed)
+      aout.value(speed)
+      delay(1) // settle
+      motor_set.state(true)
+      motor_start.state(true)
+    }
+  }
   // update state
   lastreverse = reverse
   lastspeed = speed
   runlock.leave()
-  // from here on, we are re-entrant
-  if (reversing || newspeed) {
-    log(6, "initiating: speed=%d, reverse=%d", speed, reverse)
-    var tr
-    abort(tr)
-    concurrent as tr {
-      // actual change
-      applyStop()
-      delay(if(reversing, 6, 1)) // wait, wait long for direction change
-      // update debounce time (~11hz -> 75mS .. ~90Hz -> 8mS)
-      writefile('/sys/class/counter/counter0/debounce', maprange(speed, 5, 100, 75000, 8000))
-      // direction
-      motor_l_r.state(!(reverse==true))
-      delay(if(reversing, 2, 0.1))
-      // set speed
-      aout.value(ifvalid(speed/2,0))
-      delay(1)
-      aout.value(ifvalid(speed,0))
-      delay(1)
-      // beide 1 -> läuft gemäss analogspannung
-      motor_set.state(true)
-      delay(0.1)
-      motor_start.state(true)
-    }
-    await(tr)
-    log(6, "finished applying: speed=%d, reverse=%d", speed, reverse)
-  }
 }
 
 
@@ -341,6 +376,7 @@ function startClock()
   if (!testing) {
     log(4, "start clock")
     // delay(30) // await correct NTP time
+    //log(3, "!!! enable autostart AND REGULATION again")
     restartclock(minAdjustCountDiff) // make sure we start
     log(3, "!!! enable autocalibration later")
     //initialCalibration()
@@ -349,6 +385,9 @@ function startClock()
 
 
 // MARK: - Main
+
+// program calibration speed as hispeed into motor
+programHiSpeed(calibrationSpeed)
 
 // start running
 startClock();
@@ -365,7 +404,7 @@ var reedlock = lock()
 on (every(reedIntvl)) {
   if (reedlock.enter()) {
     var reedpos = reed_bus.value()
-    log(6, "reed=0x%x", reedpos)
+    log(6, "reed=0x%x, counter=%d", reedpos, getCounter())
     if (reedpos!=lastreed) {
       // collect all bits, only report when all are gone
       if (reedpos>lastreed) {
