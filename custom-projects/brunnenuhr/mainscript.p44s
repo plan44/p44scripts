@@ -149,7 +149,7 @@ function regulate()
   // current state
   var expected = expectedCount()
   var actual = getCounter()
-  var catchup = expected-actual
+  var catchup = cyclic(expected-actual, -countsPerTurn/2, countsPerTurn/2)
   var absdiff = abs(catchup)
   var thisreg = epochtime()
   var period = thisreg-lastreg
@@ -330,8 +330,8 @@ function startClock()
     log(4, "start clock")
     // delay(30) // await correct NTP time
     log(3, "!!! enable autocalibration later")
-    //initialCalibration()
-    run(clockSpeed, false)
+    initialCalibration()
+    //run(clockSpeed, false)
   }
 }
 
