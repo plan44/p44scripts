@@ -69,7 +69,7 @@ function moveminutes(mins, speed)
   // powerdown
   abort(min_pwr_to)
   concurrent as min_pwr_to {
-    delay(mins*13*speed/normalspeed)
+    delay(abs(mins)*13*speed/normalspeed)
     writefile('/sys/class/stepper/stepper0/power', 0)
   }
 }
@@ -97,7 +97,7 @@ function movehours(hours, speed)
   // powerdown
   abort(hour_pwr_to)
   concurrent as hour_pwr_to {
-    delay(hours*13*speed/normalspeed)
+    delay(abs(hours)*13*speed/normalspeed)
     writefile('/sys/class/stepper/stepper1/power', 0)
   }
 }
