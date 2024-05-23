@@ -108,9 +108,19 @@ function hoursmoving()
 }
 
 
+var pauseminfrom = 23:42
+var pauseminto   = 07:42
+
 on (every(0:01:00, 0:00:50)) {
-  log ('every minute')
-  if (!minutesmoving()) moveminutes(1, normalspeed)
+  if (!after_time(pauseminfrom) && after_time(pauseminto)) {
+    log ('every minute')
+    if (!minutesmoving()) moveminutes(1, normalspeed)
+    leftled.alpha = 0
+  }
+  else {
+    leftled.color = '#F0F' // pink: min paused
+    leftled.alpha = 255
+  }
 }
 
 on (every(1:00:00, 0:59:50)) {
