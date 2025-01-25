@@ -108,18 +108,52 @@ function hoursmoving()
 }
 
 
-var pauseminfrom = 23:42
-var pauseminto   = 07:42
+var auto_pauseminfrom = 21:54
+var auto_pausehours   = 10
 
-on (every(0:01:00, 0:00:50)) {
-  if (!after_time(pauseminfrom) && after_time(pauseminto)) {
-    log ('every minute')
-    if (!minutesmoving()) moveminutes(1, normalspeed)
-    leftled.alpha = 0
+var pauseminfrom = null
+var pauseminto   = 1
+
+
+function paused()
+{
+  var paused
+  if (isvalid(auto_pauseminfrom)) {
+    if (is_time(auto_pauseminfrom)) {
+      // start auto-pause
+      if (isvalid(pauseminfrom)) {
+        // already paused, update start hour to now
+        var minutes = int(pauseminfrom % 3600)
+        pauseminfrom = hour()*3600+minutes
+        if (pauseminfrom>timeofday()) pauseminfrom-=1:00
+      }
+      else {
+        // not yet paused
+        pauseminfrom = auto_pauseminfrom
+      }
+      pauseminto = cyclic(pauseminfrom+auto_pausehours*3600, 0, 24:00)
+      log(4,"auto-paused until %s", formattime(pauseminto))
+    }
   }
-  else {
+  if (!isvalid(pauseminfrom)) paused = false;
+  else if (pauseminto>pauseminfrom) paused = after_time(pauseminfrom) && !after_time(pauseminto)
+  else paused = !(after_time(pauseminto) && !after_time(pauseminfrom))
+  if (paused) {
     leftled.color = '#F0F' // pink: min paused
     leftled.alpha = 255
+  }
+  else {
+    leftled.alpha = 0
+    pauseminfrom = null
+  }
+  return paused
+}
+
+
+on (every(0:01:00, 0:00:50)) {
+  if (!paused()) {
+    log ('every minute')
+    if (!minutesmoving()) moveminutes(1, normalspeed)
   }
 }
 
@@ -135,6 +169,20 @@ var leftbutton = device('leftbutton').button(0)
 on (leftbutton) evaluating as clicks {
   log("left button click = %d", clicks)
   if (clicks==1) {
+    // pause
+    if (paused()) {
+      pauseminto += 1:00
+    }
+    else {
+      pauseminfrom = timeofday() // now
+      pauseminto = pauseminfrom+1:00
+    }
+    if (paused()) {
+      log(4,"paused until %s", formattime(pauseminto))
+    }
+  }
+  else if (clicks==2) {
+    // actually set hour
     if (!hoursmoving()) movehours(1, normalspeed);
   }
   else if (clicks==5) {
