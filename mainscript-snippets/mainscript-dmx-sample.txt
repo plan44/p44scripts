@@ -1,0 +1,70 @@
+// DMX input setup
+// see: https://plan44.ch/p44-techdocs/en/script_ref/#dmxinput
+
+// === set up Art-Net/sACN receiver
+
+unset dmx
+var dmx = dmxinput('artnet:0') // sACN universe = artnet addr+1
+
+// === Helper functions
+
+// 3-channel brightness, hue, saturation channels light
+function hsvlight(name, channels)
+{
+  var out = device(name).output
+  out.channel('brightness', channels[0]/2.55)
+  out.channel('hue', channels[1]/255*360)
+  out.channel('saturation', channels[2]/2.55)
+  out.applychannels(true, 0) // override, no transition time
+}
+
+
+// 3-channel R,G,B light
+function rgblight(name, channels)
+{
+  var out = device(name).output
+  var hsv = hsv(rgb(channels[0]/255,channels[1]/255,channels[2]/255))
+  out.channel('brightness', hsv.brightness*100)
+  out.channel('hue', hsv.hue)
+  out.channel('saturation', hsv.saturation*100)
+  out.applychannels(true, 0) // override, no transition time
+}
+
+
+// simple 1-channel dimmer
+function dimmer(name, channels)
+{
+  var out = device(name).output
+  out.channel('brightness', channels[0]/2.55)
+  out.applychannels(true, 0) // override, no transition time
+}
+
+
+// === Channel mapping
+
+// Map DMX channels 1-3 to myColorLED1 as R,G,B
+on (dmx.channels(1,3)) changing as v {
+  rgblight('myColorLED1', v) // process channel changes
+  dmx.confirm(1,3) // important: confirm the channels!
+}
+
+
+// Map DMX channels 4-6 to myColorLED1 as V,H,S
+on (dmx.channels(4,6)) changing as v {
+  hsvlight('myColorLED2', v) // process channel changes
+  dmx.confirm(4,6) // important: confirm the channels!
+}
+
+
+// Map DMX channel 10 to myDALI dimmer
+on (dmx.channels(10,10)) changing as v {
+  dimmer('myDALI', v) // process channel changes
+  dmx.confirm(10,10) // important: confirm the channel!
+}
+
+
+// Map DMX channel 20 to SmartLED global brightness (see https://plan44.ch/p44-techdocs/en/script_ref/?#functions-for-configuring-led-arrangement)
+on (dmx.channels(20,20)) changing as v {
+  ledmaindim(channels[0]/2.55) // 0..100%, scale differently when you want to boost LED brightness >100%
+  dmx.confirm(10,10) // important: confirm the channel!
+}
